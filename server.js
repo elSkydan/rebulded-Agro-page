@@ -5,10 +5,31 @@ require('dotenv').config();
 const express    = require('express');
 const app        = express();
 const pool       = require('./db/pool');
-const leadsRoute = require('./server/routes/leads');
+
+const leadsRoute   = require('./server/routes/leads');
+const workersRoute = require('./server/routes/workers');
+const citiesRoute  = require('./server/routes/cities');
 const { startTimeoutCron } = require('./server/services/timeoutService');
 
 const PORT = process.env.PORT || 3000;
+
+// ---------------------------------------------------------------------------
+// CORS
+// ---------------------------------------------------------------------------
+
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  // Allow configured origin or wildcard fallback
+  if (CORS_ORIGIN === '*' || origin === CORS_ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 
 // ---------------------------------------------------------------------------
 // Middleware
@@ -16,7 +37,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Basic security headers (no extra package required)
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -27,9 +47,11 @@ app.use((req, res, next) => {
 // Routes
 // ---------------------------------------------------------------------------
 
-app.use('/api/leads', leadsRoute);
+app.use('/api/leads',   leadsRoute);
+app.use('/api/workers', workersRoute);
+app.use('/api/cities',  citiesRoute);
 
-// Health check — useful for Docker / reverse-proxy readiness probes
+// Health check
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -39,17 +61,18 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// 404 fallback
+// ---------------------------------------------------------------------------
+// Error handlers
+// ---------------------------------------------------------------------------
+
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Global error handler
 app.use((err, req, res, _next) => {
   console.error('[unhandled]', err);
   res.status(err.statusCode ?? 500).json({
     error: err.message ?? 'Internal server error',
-    code:  err.code,
   });
 });
 
@@ -58,7 +81,6 @@ app.use((err, req, res, _next) => {
 // ---------------------------------------------------------------------------
 
 async function start() {
-  // Verify DB connection before accepting traffic
   try {
     await pool.query('SELECT 1');
     console.log('[db] Connected');
@@ -74,9 +96,7 @@ async function start() {
   startTimeoutCron();
 }
 
-// Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('[server] SIGTERM received — closing DB pool');
   await pool.end();
   process.exit(0);
 });

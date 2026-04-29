@@ -3,16 +3,15 @@
 /**
  * timeoutService.js
  *
- * Cron job — runs every minute.
- * Handles two cases:
- *   1. 'assigned' leads past TIMEOUT_MINUTES  → mark timeout, reassign
- *   2. 'accepted' leads past ACCEPTED_TTL_MINUTES → mark failed_contact, notify admin
+ * Cron: every minute.
+ * Case 1 — 'assigned' leads past TIMEOUT_MINUTES → timeout + 1 reassignment attempt
+ * Case 2 — 'accepted' leads past ACCEPTED_TTL_MINUTES → failed_contact + admin notify
  *
- * Uses FOR UPDATE SKIP LOCKED so concurrent cron runs never double-process a lead.
- * Processes in batches of 20 to avoid long-running transactions.
+ * FOR UPDATE SKIP LOCKED prevents double-processing under concurrent cron ticks.
+ * Max 1 reassignment attempt per lead per timeout event.
  */
 
-const pool            = require('../../db/pool');
+const pool             = require('../db/pool');
 const { reassignLead } = require('./assignmentService');
 const telegramService  = require('./telegramService');
 const {
@@ -23,8 +22,19 @@ const {
 
 const BATCH_SIZE = 20;
 
+function log(event, leadId, workerId = null) {
+  try {
+    console.log(JSON.stringify({
+      event,
+      leadId,
+      workerId,
+      timestamp: new Date().toISOString(),
+    }));
+  } catch (_) {}
+}
+
 // ---------------------------------------------------------------------------
-// Timeout assigned leads
+// Case 1: assigned → timeout → try 1 reassignment
 // ---------------------------------------------------------------------------
 
 async function processAssignedTimeouts() {
@@ -47,42 +57,42 @@ async function processAssignedTimeouts() {
 
     timedOutIds = rows.map(r => r.id);
 
-    if (timedOutIds.length === 0) {
+    if (!timedOutIds.length) {
       await client.query('ROLLBACK');
       return;
     }
 
-    // Mark all as timeout in one query — reassignment happens outside this tx
+    // Bulk-mark timeout — individual reassignment happens outside this tx
     await client.query(
       `UPDATE leads
-       SET    status     = 'timeout',
-              updated_at = NOW()
+       SET    status = 'timeout', updated_at = NOW()
        WHERE  id = ANY($1::int[])`,
       [timedOutIds]
     );
 
     await client.query('COMMIT');
-
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {}
-    console.error('[timeoutService] processAssignedTimeouts batch error:', err.message);
+    console.error('[timeoutService] processAssignedTimeouts:', err.message);
     return;
   } finally {
     client.release();
   }
 
-  // Reassign each lead individually (each gets its own transaction)
+  // One reassignment attempt per lead — failure is logged, not re-thrown
   for (const leadId of timedOutIds) {
+    log('lead_timeout', leadId, null);
     try {
       await reassignLead(leadId, 'timeout');
     } catch (err) {
       console.error(`[timeoutService] reassignLead failed for lead ${leadId}:`, err.message);
+      // No further attempts — lead stays in current status (unassigned or timeout)
     }
   }
 }
 
 // ---------------------------------------------------------------------------
-// Failed-contact: accepted leads that went silent
+// Case 2: accepted past TTL → failed_contact
 // ---------------------------------------------------------------------------
 
 async function processAcceptedTTL() {
@@ -105,30 +115,29 @@ async function processAcceptedTTL() {
 
     expiredIds = rows.map(r => r.id);
 
-    if (expiredIds.length === 0) {
+    if (!expiredIds.length) {
       await client.query('ROLLBACK');
       return;
     }
 
     await client.query(
       `UPDATE leads
-       SET    status     = 'failed_contact',
-              updated_at = NOW()
+       SET    status = 'failed_contact', updated_at = NOW()
        WHERE  id = ANY($1::int[])`,
       [expiredIds]
     );
 
     await client.query('COMMIT');
-
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {}
-    console.error('[timeoutService] processAcceptedTTL batch error:', err.message);
+    console.error('[timeoutService] processAcceptedTTL:', err.message);
     return;
   } finally {
     client.release();
   }
 
   for (const leadId of expiredIds) {
+    log('lead_timeout', leadId, null);
     telegramService
       .notifyAdmin(ADMIN_CHAT_ID, leadId, 'Accepted but no contact — marked failed_contact')
       .catch(err =>
@@ -142,7 +151,6 @@ async function processAcceptedTTL() {
 // ---------------------------------------------------------------------------
 
 function startTimeoutCron() {
-  // node-cron: every minute
   const cron = require('node-cron');
 
   cron.schedule('* * * * *', async () => {
