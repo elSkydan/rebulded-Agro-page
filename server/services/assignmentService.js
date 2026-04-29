@@ -3,13 +3,39 @@
 /**
  * assignmentService.js
  *
- * All mutations run inside PostgreSQL transactions with SELECT FOR UPDATE.
- * Telegram calls happen strictly after COMMIT — never inside a transaction.
+ * EXECUTION ORDER (enforced, never deviate):
+ *   1. BEGIN transaction
+ *   2. INSERT or fetch lead  (done in controller before calling assignLead)
+ *   3. SELECT lead FOR UPDATE
+ *   4. Check lead.status === 'new'
+ *   5. SELECT worker
+ *   6. INSERT lead_assignments
+ *   7. UPDATE lead.status
+ *   8. COMMIT
+ *   9. AFTER COMMIT → telegramService
+ *
+ * Telegram is NEVER called inside a transaction.
+ * telegramService failure does NOT affect DB state.
  */
 
-const pool            = require('../../db/pool');;
+const pool            = require('../db/pool');
 const telegramService = require('./telegramService');
 const { ACTIVE_LEAD_LIMIT, ADMIN_CHAT_ID } = require('../../config/config');
+
+// ---------------------------------------------------------------------------
+// Structured logger — never throws
+// ---------------------------------------------------------------------------
+
+function log(event, leadId, workerId = null) {
+  try {
+    console.log(JSON.stringify({
+      event,
+      leadId,
+      workerId,
+      timestamp: new Date().toISOString(),
+    }));
+  } catch (_) {}
+}
 
 // ---------------------------------------------------------------------------
 // State machine
@@ -30,7 +56,11 @@ const ALLOWED_TRANSITIONS = {
 function assertTransition(from, to) {
   const allowed = ALLOWED_TRANSITIONS[from] ?? [];
   if (!allowed.includes(to)) {
-    console.error(`[assignmentService] Invalid transition: "${from}" -> "${to}"`);
+    console.error(JSON.stringify({
+      event: 'invalid_transition',
+      from, to,
+      timestamp: new Date().toISOString(),
+    }));
     const err = new Error(`Invalid lead status transition: "${from}" -> "${to}"`);
     err.code       = 'INVALID_TRANSITION';
     err.statusCode = 409;
@@ -39,17 +69,16 @@ function assertTransition(from, to) {
 }
 
 // ---------------------------------------------------------------------------
-// pickWorker — must run INSIDE an open transaction
+// pickWorker — INSIDE an open transaction (never lock workers table)
+//
+// Locking strategy (per spec):
+//   1. Lead row locked first (caller's responsibility, done before pickWorker)
+//   2. Worker selected by query — NOT locked (spec: NEVER lock worker table)
 // ---------------------------------------------------------------------------
 
-/**
- * NOT EXISTS is used instead of NOT IN:
- *   - correctly handles edge cases with NULLs
- *   - allows the planner to use idx_la_lead index
- */
 async function pickWorker(client, leadId, cityId) {
   const { rows } = await client.query(
-    `SELECT w.id, w.telegram_chat_id, w.name
+    `SELECT w.id, w.name, w.telegram_chat_id
      FROM   workers w
      WHERE  w.city_id   = $1
        AND  w.is_active = TRUE
@@ -75,14 +104,17 @@ async function pickWorker(client, leadId, cityId) {
 }
 
 // ---------------------------------------------------------------------------
-// assignLead
+// assignLead — main entry point
+// Returns { assigned, status, worker: {id, name} | null }
 // ---------------------------------------------------------------------------
 
 async function assignLead(leadId, cityId) {
   const client = await pool.connect();
   try {
+    // STEP 1: BEGIN
     await client.query('BEGIN');
 
+    // STEP 3: SELECT lead FOR UPDATE  (lead was inserted by controller — step 2)
     const { rows: leadRows } = await client.query(
       `SELECT id, status FROM leads WHERE id = $1 FOR UPDATE`,
       [leadId]
@@ -95,30 +127,42 @@ async function assignLead(leadId, cityId) {
       throw err;
     }
 
-    const lead = leadRows[0];
-
-    // Only assign 'new' leads — silently skip if already processed (idempotent)
-    if (lead.status !== 'new') {
+    // STEP 4: check status === 'new'
+    if (leadRows[0].status !== 'new') {
       await client.query('ROLLBACK');
-      return { assigned: false, workerId: null, status: lead.status };
+      // Idempotent — already processed, not an error
+      return { assigned: false, workerId: null, worker: null, status: leadRows[0].status };
     }
 
+    // STEP 5: select worker
     const worker = await pickWorker(client, leadId, cityId);
 
     if (!worker) {
+      // STEP 6 (no worker path): update lead → unassigned
       await client.query(
         `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
         [leadId]
       );
+      // STEP 8: COMMIT
       await client.query('COMMIT');
 
+      log('lead_rejected', leadId, null);
+
+      // STEP 9: Telegram after commit
       telegramService
         .notifyAdmin(ADMIN_CHAT_ID, leadId, 'No workers available')
-        .catch(err => console.error('[telegram] notifyAdmin failed (assignLead):', err));
+        .catch(err => console.error('[telegram] notifyAdmin failed:', err.message));
 
-      return { assigned: false, workerId: null, status: 'unassigned' };
+      return { assigned: false, workerId: null, worker: null, status: 'unassigned' };
     }
 
+    // STEP 6: INSERT lead_assignments
+    await client.query(
+      `INSERT INTO lead_assignments (lead_id, worker_id, status) VALUES ($1, $2, 'sent')`,
+      [leadId, worker.id]
+    );
+
+    // STEP 7: UPDATE lead.status
     await client.query(
       `UPDATE leads
        SET    status     = 'assigned',
@@ -133,19 +177,24 @@ async function assignLead(leadId, cityId) {
       [worker.id]
     );
 
-    await client.query(
-      `INSERT INTO lead_assignments (lead_id, worker_id, status)
-       VALUES ($1, $2, 'sent')`,
-      [leadId, worker.id]
-    );
-
+    // STEP 8: COMMIT
     await client.query('COMMIT');
 
+    // Structured log after commit
+    console.log('Assigned lead', leadId, 'to worker', worker.id);
+    log('lead_assigned', leadId, worker.id);
+
+    // STEP 9: Telegram after commit — failure never affects DB
     telegramService
       .sendLeadToWorker(worker.telegram_chat_id, leadId, worker.id)
-      .catch(err => console.error(`[telegram] sendLeadToWorker failed (lead ${leadId}):`, err));
+      .catch(err => console.error(`[telegram] sendLeadToWorker failed (lead ${leadId}):`, err.message));
 
-    return { assigned: true, workerId: worker.id, status: 'assigned' };
+    return {
+      assigned: true,
+      workerId: worker.id,
+      worker:   { id: worker.id, name: worker.name },
+      status:   'assigned',
+    };
 
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {}
@@ -157,7 +206,7 @@ async function assignLead(leadId, cityId) {
 }
 
 // ---------------------------------------------------------------------------
-// reassignLead
+// reassignLead — after rejection or timeout (max 1 attempt from timeoutService)
 // ---------------------------------------------------------------------------
 
 async function reassignLead(leadId, reason) {
@@ -178,15 +227,13 @@ async function reassignLead(leadId, reason) {
     }
 
     const lead = leadRows[0];
-
     assertTransition(lead.status, reason);
 
+    // Stamp the outgoing assignment row
     await client.query(
       `UPDATE lead_assignments
        SET    status = $1
-       WHERE  lead_id   = $2
-         AND  worker_id = $3
-         AND  status    = 'sent'`,
+       WHERE  lead_id   = $2 AND worker_id = $3 AND status = 'sent'`,
       [reason, leadId, lead.worker_id]
     );
 
@@ -204,14 +251,21 @@ async function reassignLead(leadId, reason) {
       );
       await client.query('COMMIT');
 
+      log('lead_timeout', leadId, null);
+
       telegramService
         .notifyAdmin(ADMIN_CHAT_ID, leadId, `Unassigned after ${reason}`)
-        .catch(err => console.error('[telegram] notifyAdmin failed (reassignLead):', err));
+        .catch(err => console.error('[telegram] notifyAdmin failed:', err.message));
 
-      return { assigned: false, workerId: null, status: 'unassigned' };
+      return { assigned: false, workerId: null, worker: null, status: 'unassigned' };
     }
 
     assertTransition(reason, 'assigned');
+
+    await client.query(
+      `INSERT INTO lead_assignments (lead_id, worker_id, status) VALUES ($1, $2, 'sent')`,
+      [leadId, worker.id]
+    );
 
     await client.query(
       `UPDATE leads
@@ -228,19 +282,20 @@ async function reassignLead(leadId, reason) {
       [worker.id]
     );
 
-    await client.query(
-      `INSERT INTO lead_assignments (lead_id, worker_id, status)
-       VALUES ($1, $2, 'sent')`,
-      [leadId, worker.id]
-    );
-
     await client.query('COMMIT');
+
+    log('lead_assigned', leadId, worker.id);
 
     telegramService
       .sendLeadToWorker(worker.telegram_chat_id, leadId, worker.id)
-      .catch(err => console.error(`[telegram] sendLeadToWorker failed (lead ${leadId}):`, err));
+      .catch(err => console.error(`[telegram] sendLeadToWorker failed (lead ${leadId}):`, err.message));
 
-    return { assigned: true, workerId: worker.id, status: 'assigned' };
+    return {
+      assigned: true,
+      workerId: worker.id,
+      worker:   { id: worker.id, name: worker.name },
+      status:   'assigned',
+    };
 
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {}
@@ -252,7 +307,7 @@ async function reassignLead(leadId, reason) {
 }
 
 // ---------------------------------------------------------------------------
-// applyWorkerResponse — Telegram inline button handler
+// applyWorkerResponse — Telegram inline button: accept / reject
 // ---------------------------------------------------------------------------
 
 async function applyWorkerResponse(leadId, workerId, telegramChatId, action) {
@@ -266,7 +321,6 @@ async function applyWorkerResponse(leadId, workerId, telegramChatId, action) {
   try {
     await client.query('BEGIN');
 
-    // Verify telegram_chat_id matches workerId — prevents spoofed callback_data
     const { rows: workerRows } = await client.query(
       `SELECT id FROM workers WHERE id = $1 AND telegram_chat_id = $2`,
       [workerId, telegramChatId]
@@ -278,7 +332,6 @@ async function applyWorkerResponse(leadId, workerId, telegramChatId, action) {
       throw err;
     }
 
-    // Lock lead row for update
     const { rows: leadRows } = await client.query(
       `SELECT id, status, worker_id FROM leads WHERE id = $1 FOR UPDATE`,
       [leadId]
@@ -292,26 +345,18 @@ async function applyWorkerResponse(leadId, workerId, telegramChatId, action) {
 
     const lead = leadRows[0];
 
-    // Must be 'assigned' — catches timeout races
     if (lead.status !== 'assigned') {
       await client.query('ROLLBACK');
-      console.error(
-        `[applyWorkerResponse] lead ${leadId} status is "${lead.status}", expected "assigned"`
-      );
-      const err = new Error(
-        `Lead is no longer in "assigned" state (current: "${lead.status}")`
-      );
+      console.error(`[applyWorkerResponse] lead ${leadId} status="${lead.status}", expected "assigned"`);
+      const err = new Error(`Lead is not in "assigned" state (current: "${lead.status}")`);
       err.statusCode = 409;
       err.code = 'INVALID_TRANSITION';
       throw err;
     }
 
-    // Must be assigned to THIS worker
     if (lead.worker_id !== workerId) {
       await client.query('ROLLBACK');
-      console.error(
-        `[applyWorkerResponse] lead ${leadId} worker mismatch: assigned=${lead.worker_id}, caller=${workerId}`
-      );
+      console.error(`[applyWorkerResponse] lead ${leadId} worker mismatch: assigned=${lead.worker_id}, caller=${workerId}`);
       const err = new Error('This lead is no longer assigned to you');
       err.statusCode = 409;
       throw err;
@@ -319,32 +364,26 @@ async function applyWorkerResponse(leadId, workerId, telegramChatId, action) {
 
     if (action === 'accept') {
       assertTransition(lead.status, 'accepted');
-
       await client.query(
-        `UPDATE leads SET status = 'accepted', updated_at = NOW() WHERE id = $1`,
-        [leadId]
+        `UPDATE leads SET status = 'accepted', updated_at = NOW() WHERE id = $1`, [leadId]
       );
       await client.query(
-        `UPDATE lead_assignments
-         SET    status = 'accepted'
-         WHERE  lead_id   = $1
-           AND  worker_id = $2
-           AND  status    = 'sent'`,
+        `UPDATE lead_assignments SET status = 'accepted'
+         WHERE lead_id = $1 AND worker_id = $2 AND status = 'sent'`,
         [leadId, workerId]
       );
       await client.query('COMMIT');
+      log('lead_assigned', leadId, workerId); // accepted = still same worker
 
     } else {
-      // reject: commit the lock release, then reassign in its own transaction
       await client.query('COMMIT');
+      log('lead_rejected', leadId, workerId);
       await reassignLead(leadId, 'rejected');
     }
 
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {}
-    console.error(
-      `[applyWorkerResponse] lead ${leadId} action "${action}":`, err.message
-    );
+    console.error(`[applyWorkerResponse] lead ${leadId} action="${action}":`, err.message);
     throw err;
   } finally {
     client.release();
