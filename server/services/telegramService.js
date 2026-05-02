@@ -85,7 +85,7 @@ async function sendLeadToWorker(chatId, leadId, workerId) {
   const acceptData = JSON.stringify({ l: leadId, w: workerId, a: 'accept' });
   const rejectData = JSON.stringify({ l: leadId, w: workerId, a: 'reject' });
 
-  await telegramPost('sendMessage', {
+  const result = await telegramPost('sendMessage', {
     chat_id:    chatId,
     text:       `New lead #${leadId}\n\nPlease respond within 3 minutes.`,
     parse_mode: 'HTML',
@@ -96,6 +96,10 @@ async function sendLeadToWorker(chatId, leadId, workerId) {
       ]],
     },
   });
+
+  // Return message_id so callers can store it for later editing.
+  // Existing fire-and-forget callers (.catch()) are unaffected by this addition.
+  return result?.message_id ?? null;
 }
 
 /**
