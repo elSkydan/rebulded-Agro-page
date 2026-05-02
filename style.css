@@ -226,3 +226,53 @@ select option {
     transform: translateY(24px);
   }
 }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease both;
+}
+
+
+   SCROLL PROGRESS TRACK ON SLIDER
+.range-slider-track {
+  position: relative;
+}
+
+
+   RESPONSIVE ADJUSTMENTS
+@media (max-width: 640px) {
+  h1 {
+    font-size: 2.25rem;
+    line-height: 1.2;
+  }
+}
+
+
+   UTILITY: smooth transitions for
+   before/after section image labels
+.ba-label {
+  transition: background 0.2s;
+}
+
+
+   PRIMARY COLOR CSS VARS
+:root {
+  --color-primary: #3E7B31;
+  --color-primary-dark: #2d5c23;
+  --color-primary-light: #4e9a3d;
+}
+
+
+   FOCUS VISIBLE
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
