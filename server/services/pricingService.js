@@ -7,7 +7,7 @@
  */
 
 const MIN_AREA   = 0.5;
-const MAX_AREA   = 50;
+const MAX_AREA   = 80;
 const MIN_ORDER  = 1000;
 
 const OGOROD_FLAT_THRESHOLD = 3;
