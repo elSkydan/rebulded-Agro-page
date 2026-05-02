@@ -231,20 +231,38 @@ async function reassignLead(leadId, reason) {
     // timeoutService may bulk-set lead to 'timeout' before calling reassignLead; in that case
     // assertTransition('timeout','timeout') would fail — only sync assignment rows and continue.
     if (lead.status === reason && reason === 'timeout') {
-      await client.query(
-        `UPDATE lead_assignments
-         SET    status = $1
-         WHERE  lead_id   = $2 AND worker_id = $3 AND status = 'sent'`,
-        [reason, leadId, lead.worker_id]
-      );
+      if (lead.worker_id !== null) {
+        // Single-worker flow: mark the specific worker's assignment
+        await client.query(
+          `UPDATE lead_assignments
+           SET    status = $1
+           WHERE  lead_id   = $2 AND worker_id = $3 AND status = 'sent'`,
+          [reason, leadId, lead.worker_id]
+        );
+      } else {
+        // Multi-worker distribution (worker_id = NULL): mark ALL pending assignments
+        await client.query(
+          `UPDATE lead_assignments SET status = 'timeout'
+           WHERE  lead_id = $1 AND status = 'sent'`,
+          [leadId]
+        );
+      }
     } else {
       assertTransition(lead.status, reason);
-      await client.query(
-        `UPDATE lead_assignments
-         SET    status = $1
-         WHERE  lead_id   = $2 AND worker_id = $3 AND status = 'sent'`,
-        [reason, leadId, lead.worker_id]
-      );
+      if (lead.worker_id !== null) {
+        await client.query(
+          `UPDATE lead_assignments
+           SET    status = $1
+           WHERE  lead_id   = $2 AND worker_id = $3 AND status = 'sent'`,
+          [reason, leadId, lead.worker_id]
+        );
+      } else {
+        await client.query(
+          `UPDATE lead_assignments SET status = 'timeout'
+           WHERE  lead_id = $1 AND status = 'sent'`,
+          [leadId]
+        );
+      }
       await client.query(
         `UPDATE leads SET status = $1, updated_at = NOW() WHERE id = $2`,
         [reason, leadId]
@@ -399,4 +417,201 @@ async function applyWorkerResponse(leadId, workerId, telegramChatId, action) {
   }
 }
 
-module.exports = { assignLead, reassignLead, applyWorkerResponse };
+// ---------------------------------------------------------------------------
+// acceptLead — multi-worker distribution: atomic first-come-first-served
+//
+// Idempotent:
+//   • Same worker calls twice  → { result: 'success', alreadyAccepted: true }
+//   • Different worker calls   → { result: 'already_taken' }
+//   • No pending assignment    → { result: 'already_taken' }
+// ---------------------------------------------------------------------------
+
+async function acceptLead(workerId, leadId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: workerRows } = await client.query(
+      `SELECT id FROM workers WHERE id = $1`,
+      [workerId]
+    );
+    if (!workerRows.length) {
+      await client.query('ROLLBACK');
+      const err = new Error(`Worker ${workerId} not found`);
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // Lock lead — prevents two concurrent accepts from both winning
+    const { rows: leadRows } = await client.query(
+      `SELECT id, status, worker_id FROM leads WHERE id = $1 FOR UPDATE`,
+      [leadId]
+    );
+    if (!leadRows.length) {
+      await client.query('ROLLBACK');
+      const err = new Error(`Lead ${leadId} not found`);
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const lead = leadRows[0];
+
+    // Idempotency: this worker already won
+    if (lead.worker_id === workerId && lead.status === 'accepted') {
+      await client.query('ROLLBACK');
+      return { result: 'success', alreadyAccepted: true };
+    }
+
+    // Another worker already won
+    if (lead.worker_id !== null && lead.worker_id !== workerId) {
+      await client.query('ROLLBACK');
+      return { result: 'already_taken' };
+    }
+
+    if (lead.status !== 'assigned') {
+      await client.query('ROLLBACK');
+      const err = new Error(`Lead ${leadId} is not available (status: "${lead.status}")`);
+      err.statusCode = 409;
+      err.code = 'INVALID_TRANSITION';
+      throw err;
+    }
+
+    // Verify this worker has a pending (sent) assignment
+    const { rows: assignRows } = await client.query(
+      `SELECT id FROM lead_assignments
+       WHERE lead_id = $1 AND worker_id = $2 AND status = 'sent'`,
+      [leadId, workerId]
+    );
+    if (!assignRows.length) {
+      await client.query('ROLLBACK');
+      // Assignment was already resolved (timed out or rejected by another path)
+      return { result: 'already_taken' };
+    }
+
+    // Mark this assignment accepted
+    await client.query(
+      `UPDATE lead_assignments
+       SET    status = 'accepted', responded_at = NOW()
+       WHERE  lead_id = $1 AND worker_id = $2`,
+      [leadId, workerId]
+    );
+
+    // Reject all competing pending assignments; return their data for message editing
+    const { rows: rejectedRows } = await client.query(
+      `UPDATE lead_assignments
+       SET    status = 'rejected', responded_at = NOW()
+       FROM   workers
+       WHERE  lead_assignments.lead_id    = $1
+         AND  lead_assignments.worker_id != $2
+         AND  lead_assignments.status     = 'sent'
+         AND  workers.id = lead_assignments.worker_id
+       RETURNING
+         lead_assignments.worker_id,
+         lead_assignments.message_id,
+         workers.telegram_chat_id`,
+      [leadId, workerId]
+    );
+
+    // Award lead to this worker
+    await client.query(
+      `UPDATE leads
+       SET    status    = 'accepted',
+              worker_id = $1,
+              updated_at = NOW()
+       WHERE  id = $2`,
+      [workerId, leadId]
+    );
+
+    await client.query(
+      `UPDATE workers SET last_assigned_at = NOW() WHERE id = $1`,
+      [workerId]
+    );
+
+    await client.query('COMMIT');
+
+    log('lead_accepted', leadId, workerId);
+
+    return { result: 'success', rejectedWorkers: rejectedRows };
+
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    console.error(`[acceptLead] lead ${leadId} worker ${workerId}:`, err.message);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// rejectLead — multi-worker distribution: one worker declines
+//
+// If this is the last pending assignment and none were accepted,
+// the lead is automatically moved to 'unassigned' and admin is notified.
+// ---------------------------------------------------------------------------
+
+async function rejectLead(workerId, leadId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rowCount } = await client.query(
+      `UPDATE lead_assignments
+       SET    status = 'rejected', responded_at = NOW()
+       WHERE  lead_id   = $1
+         AND  worker_id = $2
+         AND  status    = 'sent'`,
+      [leadId, workerId]
+    );
+
+    if (!rowCount) {
+      await client.query('ROLLBACK');
+      // Idempotent: already rejected or assignment not found
+      return { result: 'no_op' };
+    }
+
+    // Check remaining pending assignments
+    const { rows: pendingRows } = await client.query(
+      `SELECT COUNT(*) AS count
+       FROM   lead_assignments
+       WHERE  lead_id = $1 AND status = 'sent'`,
+      [leadId]
+    );
+    const pendingCount = parseInt(pendingRows[0].count, 10);
+
+    // Check if already accepted by another worker
+    const { rows: acceptedRows } = await client.query(
+      `SELECT COUNT(*) AS count
+       FROM   lead_assignments
+       WHERE  lead_id = $1 AND status = 'accepted'`,
+      [leadId]
+    );
+    const acceptedCount = parseInt(acceptedRows[0].count, 10);
+
+    await client.query('COMMIT');
+
+    log('lead_rejected', leadId, workerId);
+
+    // All workers have responded, no one accepted — no takers
+    if (pendingCount === 0 && acceptedCount === 0) {
+      await pool.query(
+        `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
+        [leadId]
+      );
+      telegramService
+        .notifyAdmin(ADMIN_CHAT_ID, leadId, 'All workers rejected — lead unassigned')
+        .catch(err => console.error('[rejectLead] notifyAdmin failed:', err.message));
+      return { result: 'unassigned' };
+    }
+
+    return { result: 'rejected', pendingCount };
+
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    console.error(`[rejectLead] lead ${leadId} worker ${workerId}:`, err.message);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { assignLead, reassignLead, applyWorkerResponse, acceptLead, rejectLead };
