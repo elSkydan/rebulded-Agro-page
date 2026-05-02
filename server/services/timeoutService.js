@@ -147,6 +147,82 @@ async function processAcceptedTTL() {
 }
 
 // ---------------------------------------------------------------------------
+// handleLeadTimeout — single-lead timeout (callable on demand or by cron)
+//
+// Marks all pending (sent) assignments older than TIMEOUT_MINUTES as timeout.
+// If nothing was accepted, moves lead to 'unassigned' and notifies admin.
+// ---------------------------------------------------------------------------
+
+async function handleLeadTimeout(leadId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: leadRows } = await client.query(
+      `SELECT id, status FROM leads WHERE id = $1 FOR UPDATE`,
+      [leadId]
+    );
+
+    if (!leadRows.length) {
+      await client.query('ROLLBACK');
+      return { result: 'not_found' };
+    }
+
+    const { status } = leadRows[0];
+
+    if (!['assigned', 'new'].includes(status)) {
+      await client.query('ROLLBACK');
+      return { result: 'skipped', status };
+    }
+
+    // Mark stale pending assignments as timeout
+    const { rowCount: timedOut } = await client.query(
+      `UPDATE lead_assignments
+       SET    status = 'timeout'
+       WHERE  lead_id    = $1
+         AND  status     = 'sent'
+         AND  created_at < NOW() - ($2 || ' minutes')::INTERVAL`,
+      [leadId, TIMEOUT_MINUTES]
+    );
+
+    // Check whether any worker already accepted
+    const { rows: acceptedRows } = await client.query(
+      `SELECT COUNT(*) AS count
+       FROM   lead_assignments
+       WHERE  lead_id = $1 AND status = 'accepted'`,
+      [leadId]
+    );
+    const acceptedCount = parseInt(acceptedRows[0].count, 10);
+
+    if (acceptedCount === 0) {
+      await client.query(
+        `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
+        [leadId]
+      );
+      await client.query('COMMIT');
+
+      log('lead_timeout', leadId, null);
+
+      telegramService
+        .notifyAdmin(ADMIN_CHAT_ID, leadId, 'Lead timed out — no worker responded')
+        .catch(err => console.error('[timeoutService] notifyAdmin failed:', err.message));
+
+      return { result: 'expired', timedOutCount: timedOut ?? 0 };
+    }
+
+    await client.query('COMMIT');
+    return { result: 'accepted_exists', timedOutCount: timedOut ?? 0 };
+
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    console.error(`[handleLeadTimeout] lead ${leadId}:`, err.message);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Start cron
 // ---------------------------------------------------------------------------
 
@@ -165,4 +241,4 @@ function startTimeoutCron() {
   console.log('[timeoutService] Cron started (every minute)');
 }
 
-module.exports = { startTimeoutCron };
+module.exports = { startTimeoutCron, handleLeadTimeout };
