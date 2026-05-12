@@ -104,6 +104,82 @@ async function pickWorker(client, leadId, cityId) {
 }
 
 // ---------------------------------------------------------------------------
+// logPickWorkerDiagnostics — called only when pickWorker returns null
+//
+// Runs supplementary diagnostic queries on the SAME transaction client to
+// explain WHY no worker was selected.  Must be called before COMMIT so the
+// FOR UPDATE lock on the lead is still held.
+//
+// Does NOT throw — diagnostic failure must never affect the main flow.
+// ---------------------------------------------------------------------------
+
+async function logPickWorkerDiagnostics(client, leadId, cityId) {
+  try {
+    const [totalRes, activeRes, underLimitRes, notTriedRes] = await Promise.all([
+      // All workers registered in this city (any status)
+      client.query(
+        `SELECT COUNT(*) AS n FROM workers WHERE city_id = $1`,
+        [cityId]
+      ),
+      // Active workers in city
+      client.query(
+        `SELECT COUNT(*) AS n FROM workers WHERE city_id = $1 AND is_active = TRUE`,
+        [cityId]
+      ),
+      // Active workers in city that are under the active-lead limit
+      client.query(
+        `SELECT COUNT(*) AS n
+         FROM   workers w
+         WHERE  w.city_id   = $1
+           AND  w.is_active = TRUE
+           AND  (SELECT COUNT(*)
+                 FROM   leads l
+                 WHERE  l.worker_id = w.id
+                   AND  l.status IN ('assigned', 'accepted')
+                ) < $2`,
+        [cityId, ACTIVE_LEAD_LIMIT]
+      ),
+      // Active workers in city that have NOT been tried for this lead yet
+      client.query(
+        `SELECT COUNT(*) AS n
+         FROM   workers w
+         WHERE  w.city_id   = $1
+           AND  w.is_active = TRUE
+           AND  NOT EXISTS (
+                  SELECT 1 FROM lead_assignments la
+                  WHERE  la.lead_id   = $2
+                    AND  la.worker_id = w.id
+                )`,
+        [cityId, leadId]
+      ),
+    ]);
+
+    const workersInCity      = parseInt(totalRes.rows[0].n,       10);
+    const workersActive      = parseInt(activeRes.rows[0].n,      10);
+    const workersUnderLimit  = parseInt(underLimitRes.rows[0].n,  10);
+    const workersNotTried    = parseInt(notTriedRes.rows[0].n,    10);
+
+    console.log(JSON.stringify({
+      event:               'pick_worker_failed',
+      leadId,
+      cityId,
+      ACTIVE_LEAD_LIMIT,
+      workersInCity,
+      workersActive,
+      workersUnderLimit,
+      workersNotTried,
+      filteredInactive:    workersInCity  - workersActive,
+      filteredOverloaded:  workersActive  - workersUnderLimit,
+      filteredAlreadyTried: workersActive - workersNotTried,
+      timestamp:           new Date().toISOString(),
+    }));
+  } catch (diagErr) {
+    // Diagnostic failure must never propagate
+    console.error('[pickWorker] diagnostic query failed:', diagErr.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // assignLead — main entry point
 // Returns { assigned, status, worker: {id, name} | null }
 // ---------------------------------------------------------------------------
@@ -138,6 +214,9 @@ async function assignLead(leadId, cityId) {
     const worker = await pickWorker(client, leadId, cityId);
 
     if (!worker) {
+      // Log WHY no worker was found before committing the transaction
+      await logPickWorkerDiagnostics(client, leadId, cityId);
+
       // STEP 6 (no worker path): update lead → unassigned
       await client.query(
         `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
@@ -184,9 +263,22 @@ async function assignLead(leadId, cityId) {
     console.log('Assigned lead', leadId, 'to worker', worker.id);
     log('lead_assigned', leadId, worker.id);
 
-    // STEP 9: Telegram after commit — failure never affects DB
+    // STEP 9: Telegram after commit — failure never affects DB.
+    // Capture the returned message_id and persist it so editMessageText()
+    // can later update the worker's message on accept/reject/timeout.
     telegramService
       .sendLeadToWorker(worker.telegram_chat_id, leadId, worker.id)
+      .then(messageId => {
+        if (messageId) {
+          pool.query(
+            `UPDATE lead_assignments SET message_id = $1
+             WHERE  lead_id = $2 AND worker_id = $3`,
+            [messageId, leadId, worker.id]
+          ).catch(err =>
+            console.error(`[telegram] persist message_id failed (lead ${leadId}):`, err.message)
+          );
+        }
+      })
       .catch(err => console.error(`[telegram] sendLeadToWorker failed (lead ${leadId}):`, err.message));
 
     return {
@@ -272,6 +364,8 @@ async function reassignLead(leadId, reason) {
     const worker = await pickWorker(client, leadId, lead.city_id);
 
     if (!worker) {
+      await logPickWorkerDiagnostics(client, leadId, lead.city_id);
+
       await client.query(
         `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
         [leadId]
@@ -315,6 +409,17 @@ async function reassignLead(leadId, reason) {
 
     telegramService
       .sendLeadToWorker(worker.telegram_chat_id, leadId, worker.id)
+      .then(messageId => {
+        if (messageId) {
+          pool.query(
+            `UPDATE lead_assignments SET message_id = $1
+             WHERE  lead_id = $2 AND worker_id = $3`,
+            [messageId, leadId, worker.id]
+          ).catch(err =>
+            console.error(`[telegram] persist message_id failed (lead ${leadId}):`, err.message)
+          );
+        }
+      })
       .catch(err => console.error(`[telegram] sendLeadToWorker failed (lead ${leadId}):`, err.message));
 
     return {
@@ -535,6 +640,16 @@ async function acceptLead(workerId, leadId) {
 
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {}
+
+    // PG error 23505 = unique_violation.
+    // uq_la_lead_accepted fires when two workers accept concurrently;
+    // the second transaction loses the race.  Return a clean business
+    // response instead of letting a 500 reach the webhook handler.
+    if (err.code === '23505') {
+      log('accept_lead_race_lost', leadId, workerId);
+      return { result: 'already_taken' };
+    }
+
     console.error(`[acceptLead] lead ${leadId} worker ${workerId}:`, err.message);
     throw err;
   } finally {
@@ -587,16 +702,23 @@ async function rejectLead(workerId, leadId) {
     );
     const acceptedCount = parseInt(acceptedRows[0].count, 10);
 
+    // All workers have responded and none accepted — mark lead unassigned
+    // inside the SAME transaction so lead_assignments + leads are always
+    // consistent (previously this used pool.query after COMMIT — bug fix P5).
+    let allRejected = false;
+    if (pendingCount === 0 && acceptedCount === 0) {
+      await client.query(
+        `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
+        [leadId]
+      );
+      allRejected = true;
+    }
+
     await client.query('COMMIT');
 
     log('lead_rejected', leadId, workerId);
 
-    // All workers have responded, no one accepted — no takers
-    if (pendingCount === 0 && acceptedCount === 0) {
-      await pool.query(
-        `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
-        [leadId]
-      );
+    if (allRejected) {
       telegramService
         .notifyAdmin(ADMIN_CHAT_ID, leadId, 'All workers rejected — lead unassigned')
         .catch(err => console.error('[rejectLead] notifyAdmin failed:', err.message));

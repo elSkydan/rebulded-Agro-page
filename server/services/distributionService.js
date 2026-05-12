@@ -14,6 +14,25 @@
  *
  * After distribution the lead moves to status='assigned' with worker_id=NULL.
  * The partial unique index uq_la_lead_accepted prevents double-acceptance.
+ *
+ * ── ACTIVATION STATUS ────────────────────────────────────────────────────────
+ * STATUS: INTENTIONALLY INACTIVE — NOT wired into any route.
+ *
+ * The active lead submission path (POST /api/leads → routes/leads.js) uses
+ * assignmentService.assignLead() which assigns exactly one worker at a time.
+ *
+ * distributeLead() is a completed implementation of a parallel fan-out flow
+ * (up to DISTRIBUTION_BATCH_SIZE workers notified simultaneously; first to
+ * accept wins).  It was developed alongside the single-worker flow but has
+ * not been activated.
+ *
+ * To activate: import distributeLead from this file in routes/leads.js and
+ * call it instead of / in addition to assignLead().  The acceptLead /
+ * rejectLead functions in assignmentService already handle the multi-worker
+ * race (partial unique index uq_la_lead_accepted + RETURNING clause).
+ *
+ * Do NOT delete this file. Do NOT wire it in without a deliberate decision.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 const pool               = require('../../db/pool');
