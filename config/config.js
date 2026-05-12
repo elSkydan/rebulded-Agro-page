@@ -4,6 +4,10 @@ module.exports = {
   DATABASE_URL:          process.env.DATABASE_URL,
   TELEGRAM_TOKEN:        process.env.TELEGRAM_BOT_TOKEN,
   ADMIN_CHAT_ID:         Number(process.env.ADMIN_CHAT_ID)          || 0,
+  // Separate channel for delivery-failure alerts (e.g. blocked bot, missing chat_id).
+  // Defaults to ADMIN_CHAT_ID when not set independently.
+  ADMIN_LOG_CHANNEL:     Number(process.env.ADMIN_LOG_CHANNEL)       ||
+                         Number(process.env.ADMIN_CHAT_ID)           || 0,
   ADMIN_TOKEN:           process.env.ADMIN_TOKEN                    || 'change-me',
   ACTIVE_LEAD_LIMIT:     Number(process.env.ACTIVE_LEAD_LIMIT)      || 3,
   TIMEOUT_MINUTES:       Number(process.env.TIMEOUT_MINUTES)        || 3,

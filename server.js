@@ -29,11 +29,22 @@ const PORT = process.env.PORT || 3000;
 // CORS
 // ---------------------------------------------------------------------------
 
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
+// CORS_ORIGIN may be:
+//   '*'                                       — allow any origin
+//   'http://example.com'                      — single origin
+//   'http://example.com,http://localhost:3000' — comma-separated list
+const _rawCors     = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const CORS_ORIGINS = _rawCors === '*'
+  ? '*'
+  : _rawCors.split(',').map(o => o.trim()).filter(Boolean);
 
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (CORS_ORIGIN === '*' || origin === CORS_ORIGIN) {
+  const origin  = req.headers.origin;
+  const allowed =
+    CORS_ORIGINS === '*' ||
+    (Array.isArray(CORS_ORIGINS) && !!origin && CORS_ORIGINS.includes(origin));
+
+  if (allowed) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');

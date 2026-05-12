@@ -19,6 +19,7 @@ const rateLimiter                      = require('../middlewares/rateLimiter');
 const { validateLead, normalizePhone } = require('../middlewares/validateLead');
 const auth                             = require('../middlewares/auth');
 const { SPAM_WINDOW_MINUTES }          = require('../../config/config');
+const { respondLeadDbError }           = require('../utils/pgLeadError');
 
 // Statuses that mean the lead lifecycle is over — allow new lead from same phone
 const TERMINAL_STATUSES = ['completed', 'canceled', 'failed_contact'];
@@ -38,7 +39,19 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
     area,
     city_id,
     out_of_city = false,
+    comment,
   } = req.body;
+
+  // Validate comment: optional free-text, max 1000 characters.
+  if (comment !== undefined && comment !== null) {
+    if (typeof comment !== 'string') {
+      return res.status(422).json({ error: 'Validation failed', fields: [{ field: 'comment', message: 'Must be a string' }] });
+    }
+    if (comment.length > 1000) {
+      return res.status(422).json({ error: 'Validation failed', fields: [{ field: 'comment', message: 'Must be 1000 characters or fewer' }] });
+    }
+  }
+  const commentValue = (typeof comment === 'string' ? comment.trim() : null) || null;
 
   // phone is already validated by validateLead middleware, but normalize here
   // for use in the DB query
@@ -63,8 +76,7 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
     }
     city = rows[0];
   } catch (err) {
-    console.error('[POST /leads] city lookup:', err);
-    return res.status(500).json({ error: 'Database error' });
+    return respondLeadDbError(res, err, '[POST /leads] city lookup');
   }
 
   // ── Server-side price calculation ───────────────────────
@@ -92,15 +104,15 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
     );
     existingLead = rows[0] ?? null;
   } catch (err) {
-    console.error('[POST /leads] spam check:', err);
-    return res.status(500).json({ error: 'Database error' });
+    return respondLeadDbError(res, err, '[POST /leads] spam check');
   }
 
   // ── Upsert lead ─────────────────────────────────────────
   let leadId;
 
   if (existingLead && !TERMINAL_STATUSES.includes(existingLead.status)) {
-    // Active duplicate: update fields in place, keep the same lead id
+    // Active duplicate: update fields and force re-assignment for current city/service.
+    // This prevents stale worker-city mismatch when customer resubmits with another city.
     try {
       await pool.query(
         `UPDATE leads
@@ -109,14 +121,16 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
                 total_price  = $3,
                 out_of_city  = $4,
                 city_id      = $5,
+                worker_id    = NULL,
+                status       = 'new',
+                comment      = $6,
                 updated_at   = NOW()
-         WHERE  id = $6`,
-        [service_type, area, totalPrice, out_of_city, city_id, existingLead.id]
+         WHERE  id = $7`,
+        [service_type, area, totalPrice, out_of_city, city_id, commentValue, existingLead.id]
       );
       leadId = existingLead.id;
     } catch (err) {
-      console.error('[POST /leads] update existing lead:', err);
-      return res.status(500).json({ error: 'Database error' });
+      return respondLeadDbError(res, err, '[POST /leads] update existing lead');
     }
   } else {
     // New lead
@@ -124,16 +138,15 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
       const { rows } = await pool.query(
         `INSERT INTO leads
            (name, phone_normalized, phone_raw, service_type,
-            area, total_price, city_id, out_of_city, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new')
+            area, total_price, city_id, out_of_city, comment, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new')
          RETURNING id`,
         [name, phoneNormalized, phone, service_type,
-         area, totalPrice, city_id, out_of_city]
+         area, totalPrice, city_id, out_of_city, commentValue]
       );
       leadId = rows[0].id;
     } catch (err) {
-      console.error('[POST /leads] insert lead:', err);
-      return res.status(500).json({ error: 'Database error' });
+      return respondLeadDbError(res, err, '[POST /leads] insert lead');
     }
   }
 
