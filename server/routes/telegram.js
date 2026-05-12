@@ -21,6 +21,7 @@ const router                     = express.Router();
 const { acceptLead, applyWorkerResponse } = require('../services/assignmentService');
 const telegramService            = require('../services/telegramService');
 const { ADMIN_CHAT_ID }          = require('../../config/config');
+const pool                       = require('../../db/pool');
 
 // ---------------------------------------------------------------------------
 // POST /api/telegram/webhook
@@ -88,11 +89,37 @@ async function handleAccept({ leadId, workerId, telegramChatId, messageId, callb
   const result = await acceptLead(workerId, leadId);
 
   if (result.result === 'success') {
+    // Bug 3 fix: fetch lead details so the accept confirmation shows client contact.
+    // This is a lightweight read after the accept transaction has already committed.
+    let leadData = null;
+    try {
+      const { rows } = await pool.query(
+        `SELECT l.name, l.phone_normalized, l.service_type, l.area,
+                l.total_price, l.city_id, l.out_of_city, l.comment,
+                c.name AS city_name
+         FROM   leads l
+         LEFT JOIN cities c ON c.id = l.city_id
+         WHERE  l.id = $1`,
+        [leadId]
+      );
+      leadData = rows[0] ?? null;
+    } catch (err) {
+      console.error(`[telegram webhook] lead fetch for accept confirmation failed (lead ${leadId}):`, err.message);
+      // Non-fatal — fall back to bare confirmation text
+    }
+
+    const confirmText = leadData
+      ? telegramService.buildLeadText(leadId, leadData).replace(
+          /⏰ Please respond within 3 minutes\./,
+          '✅ <b>You accepted this lead. Call the client now!</b>'
+        )
+      : `✅ Lead #${leadId} is assigned to you!`;
+
     await Promise.allSettled([
-      telegramService.editMessageText(
-        telegramChatId, messageId,
-        `Lead #${leadId} is assigned to you!`
-      ),
+      // Bug 4 guard: skip edit when messageId is missing
+      messageId
+        ? telegramService.editMessageText(telegramChatId, messageId, confirmText)
+        : Promise.resolve(),
       telegramService.notifyAdmin(
         ADMIN_CHAT_ID, leadId,
         `Accepted by worker ${workerId}`
@@ -119,10 +146,10 @@ async function handleAccept({ leadId, workerId, telegramChatId, messageId, callb
 
   } else if (result.result === 'already_taken') {
     await Promise.allSettled([
-      telegramService.editMessageText(
-        telegramChatId, messageId,
-        `Lead #${leadId} has already been taken.`
-      ),
+      // Bug 4 guard
+      messageId
+        ? telegramService.editMessageText(telegramChatId, messageId, `Lead #${leadId} has already been taken.`)
+        : Promise.resolve(),
       telegramService.answerCallback(callbackQueryId, 'Already taken'),
     ]);
 
