@@ -72,33 +72,72 @@ async function telegramPost(method, payload) {
 // Public API
 // ---------------------------------------------------------------------------
 
+// Human-readable labels for service types stored in the DB.
+const SERVICE_LABELS = {
+  ogorod:  'Garden tilling',
+  celina:  'Virgin land',
+  mowing:  'Mowing',
+  tree:    'Tree work',
+  washing: 'Washing',
+};
+
+/**
+ * Build the worker-facing lead notification text.
+ * When `lead` is provided, includes all client/job details.
+ * Falls back to the bare "New lead #N" string when `lead` is null.
+ *
+ * @param {number} leadId
+ * @param {object|null} lead  — fields: name, phone_normalized, service_type, area,
+ *                              total_price, city_name, out_of_city, comment
+ * @returns {string}
+ */
+function buildLeadText(leadId, lead) {
+  if (!lead) return `New lead #${leadId}\n\nPlease respond within 3 minutes.`;
+
+  const serviceLabel = SERVICE_LABELS[lead.service_type] ?? lead.service_type;
+  const lines = [
+    `📋 <b>New lead #${leadId}</b>`,
+    ``,
+    `👤 <b>Client:</b> ${lead.name}`,
+    `📞 <b>Phone:</b> ${lead.phone_normalized}`,
+    `🛠 <b>Service:</b> ${serviceLabel}`,
+    `📐 <b>Area:</b> ${lead.area} m²`,
+    `🌆 <b>City:</b> ${lead.city_name ?? lead.city_id}`,
+  ];
+  if (lead.out_of_city) lines.push(`🚗 <b>Out of city:</b> Yes`);
+  if (lead.comment)     lines.push(`💬 <b>Comment:</b> ${lead.comment}`);
+  lines.push(``, `💰 <b>Price:</b> ${lead.total_price} UAH`);
+  lines.push(``, `⏰ Please respond within 3 minutes.`);
+  return lines.join('\n');
+}
+
 /**
  * Send a new lead notification to a worker with Accept / Reject inline buttons.
  *
  * callback_data is kept short (JSON, under 64 bytes) using single-char keys.
  *
- * @param {number} chatId
- * @param {number} leadId
- * @param {number} workerId
+ * @param {number}      chatId
+ * @param {number}      leadId
+ * @param {number}      workerId
+ * @param {object|null} lead     — optional; when provided the message shows full details
  */
-async function sendLeadToWorker(chatId, leadId, workerId) {
+async function sendLeadToWorker(chatId, leadId, workerId, lead = null) {
   const acceptData = JSON.stringify({ l: leadId, w: workerId, a: 'accept' });
   const rejectData = JSON.stringify({ l: leadId, w: workerId, a: 'reject' });
 
   const result = await telegramPost('sendMessage', {
     chat_id:    chatId,
-    text:       `New lead #${leadId}\n\nPlease respond within 3 minutes.`,
+    text:       buildLeadText(leadId, lead),
     parse_mode: 'HTML',
     reply_markup: {
       inline_keyboard: [[
-        { text: 'Accept', callback_data: acceptData },
-        { text: 'Reject', callback_data: rejectData },
+        { text: 'Accept ✅', callback_data: acceptData },
+        { text: 'Reject ❌', callback_data: rejectData },
       ]],
     },
   });
 
   // Return message_id so callers can store it for later editing.
-  // Existing fire-and-forget callers (.catch()) are unaffected by this addition.
   return result?.message_id ?? null;
 }
 
@@ -145,4 +184,4 @@ async function editMessageText(chatId, messageId, text) {
   });
 }
 
-module.exports = { sendLeadToWorker, notifyAdmin, answerCallback, editMessageText };
+module.exports = { sendLeadToWorker, buildLeadText, notifyAdmin, answerCallback, editMessageText };

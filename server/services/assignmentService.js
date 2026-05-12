@@ -191,8 +191,17 @@ async function assignLead(leadId, cityId) {
     await client.query('BEGIN');
 
     // STEP 3: SELECT lead FOR UPDATE  (lead was inserted by controller — step 2)
+    // Join cities so we have city_name ready for the Telegram message (no extra query).
+    // FOR UPDATE OF l locks only the leads row; cities is read-only here.
     const { rows: leadRows } = await client.query(
-      `SELECT id, status FROM leads WHERE id = $1 FOR UPDATE`,
+      `SELECT l.id, l.status, l.name, l.phone_normalized,
+              l.service_type, l.area, l.total_price,
+              l.city_id, l.out_of_city, l.comment,
+              c.name AS city_name
+       FROM   leads l
+       LEFT JOIN cities c ON c.id = l.city_id
+       WHERE  l.id = $1
+       FOR UPDATE OF l`,
       [leadId]
     );
 
@@ -264,10 +273,12 @@ async function assignLead(leadId, cityId) {
     log('lead_assigned', leadId, worker.id);
 
     // STEP 9: Telegram after commit — failure never affects DB.
+    // Pass the full lead object so the worker sees all client/job details.
     // Capture the returned message_id and persist it so editMessageText()
     // can later update the worker's message on accept/reject/timeout.
+    const leadData = leadRows[0];
     telegramService
-      .sendLeadToWorker(worker.telegram_chat_id, leadId, worker.id)
+      .sendLeadToWorker(worker.telegram_chat_id, leadId, worker.id, leadData)
       .then(messageId => {
         if (messageId) {
           pool.query(
@@ -307,7 +318,15 @@ async function reassignLead(leadId, reason) {
     await client.query('BEGIN');
 
     const { rows: leadRows } = await client.query(
-      `SELECT id, status, city_id, worker_id FROM leads WHERE id = $1 FOR UPDATE`,
+      `SELECT l.id, l.status, l.city_id, l.worker_id,
+              l.name, l.phone_normalized,
+              l.service_type, l.area, l.total_price,
+              l.out_of_city, l.comment,
+              c.name AS city_name
+       FROM   leads l
+       LEFT JOIN cities c ON c.id = l.city_id
+       WHERE  l.id = $1
+       FOR UPDATE OF l`,
       [leadId]
     );
 
@@ -407,8 +426,9 @@ async function reassignLead(leadId, reason) {
 
     log('lead_assigned', leadId, worker.id);
 
+    const leadData = leadRows[0];
     telegramService
-      .sendLeadToWorker(worker.telegram_chat_id, leadId, worker.id)
+      .sendLeadToWorker(worker.telegram_chat_id, leadId, worker.id, leadData)
       .then(messageId => {
         if (messageId) {
           pool.query(
