@@ -13,6 +13,11 @@ path.resolve = function (...args) {
 
 require('dotenv').config();
 
+// Fail-fast: validate all required env vars before any service initialises.
+// Application exits with code 1 if token/chat_id are missing or placeholders.
+const { validateEnv } = require('./config/validateEnv');
+validateEnv();
+
 const express    = require('express');
 const app        = express();
 const pool       = require('./db/pool');

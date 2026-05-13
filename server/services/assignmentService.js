@@ -23,6 +23,47 @@ const telegramService = require('./telegramService');
 const { ACTIVE_LEAD_LIMIT, ADMIN_CHAT_ID } = require('../../config/config');
 
 // ---------------------------------------------------------------------------
+// verifyWorkerTelegramIdentity
+//
+// Security check: the worker's Telegram user id (from cq.from.id) must match
+// the telegram_chat_id stored in the workers table.
+//
+// Rationale: callback_data carries workerId in plain JSON.  A malicious or
+// confused user could press a button that belongs to another worker.  We
+// verify the SENDER's Telegram identity against the DB record so that only
+// the correct worker can accept or reject a lead.
+//
+// This is a standalone read (uses pool, not a transaction client) so it can
+// be called from route handlers before the business-logic transaction begins.
+// There is an inherent TOCTOU window between this check and the transaction,
+// but telegram_chat_id changes are admin-only and extremely rare; the check
+// is repeated inside applyWorkerResponse for defense-in-depth.
+//
+// Throws an error with statusCode 403 and code 'WORKER_IDENTITY_MISMATCH'
+// when the identity does not match.
+//
+// @param {number} workerId
+// @param {string|number} telegramChatId   — cq.from.id from the webhook
+// @returns {Promise<void>}
+// ---------------------------------------------------------------------------
+
+async function verifyWorkerTelegramIdentity(workerId, telegramChatId) {
+  const { rows } = await pool.query(
+    `SELECT id FROM workers WHERE id = $1 AND telegram_chat_id = $2`,
+    [workerId, telegramChatId]
+  );
+
+  if (!rows.length) {
+    const err = new Error(
+      `Worker identity mismatch: workerId=${workerId} vs telegram_chat_id=${telegramChatId}`
+    );
+    err.statusCode = 403;
+    err.code       = 'WORKER_IDENTITY_MISMATCH';
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Structured logger — never throws
 // ---------------------------------------------------------------------------
 
@@ -460,6 +501,23 @@ async function reassignLead(leadId, reason) {
 
 // ---------------------------------------------------------------------------
 // applyWorkerResponse — Telegram inline button: accept / reject
+//
+// Transaction boundaries:
+//   BEGIN
+//     1. Verify worker identity (defense-in-depth; also checked pre-call)
+//     2. Lock lead row (FOR UPDATE)
+//     3. Validate lead.status === 'assigned'
+//     4. Validate lead.worker_id === workerId (correct worker is responding)
+//     5a. ACCEPT → UPDATE leads + lead_assignments; COMMIT
+//     5b. REJECT → COMMIT (verification only — no state changes here;
+//                  reassignLead owns the reject state machine below)
+//   END
+//
+// Post-commit (reject path only):
+//   reassignLead() runs in its OWN transaction via a fresh pool client.
+//   It is called AFTER client.release() so it is completely outside the
+//   primary transaction scope.  A reassignment failure cannot attempt to
+//   ROLLBACK an already-committed transaction (previous bug).
 // ---------------------------------------------------------------------------
 
 async function applyWorkerResponse(leadId, workerId, telegramChatId, action) {
@@ -469,27 +527,33 @@ async function applyWorkerResponse(leadId, workerId, telegramChatId, action) {
     throw err;
   }
 
-  const client = await pool.connect();
+  const client    = await pool.connect();
+  let committed   = false;   // guards ROLLBACK — never ROLLBACK after COMMIT
+  let doReassign  = false;   // set true only after successful reject COMMIT
+
   try {
+    // ── BEGIN ──────────────────────────────────────────────────────────────
     await client.query('BEGIN');
 
+    // Step 1: Verify caller is the actual worker (defense-in-depth;
+    //         primary check runs in the route handler via verifyWorkerTelegramIdentity)
     const { rows: workerRows } = await client.query(
       `SELECT id FROM workers WHERE id = $1 AND telegram_chat_id = $2`,
       [workerId, telegramChatId]
     );
     if (!workerRows.length) {
-      await client.query('ROLLBACK');
       const err = new Error('Worker identity mismatch');
       err.statusCode = 403;
+      err.code       = 'WORKER_IDENTITY_MISMATCH';
       throw err;
     }
 
+    // Step 2: Lock lead row to prevent concurrent accept/reject races
     const { rows: leadRows } = await client.query(
       `SELECT id, status, worker_id FROM leads WHERE id = $1 FOR UPDATE`,
       [leadId]
     );
     if (!leadRows.length) {
-      await client.query('ROLLBACK');
       const err = new Error(`Lead ${leadId} not found`);
       err.statusCode = 404;
       throw err;
@@ -497,48 +561,98 @@ async function applyWorkerResponse(leadId, workerId, telegramChatId, action) {
 
     const lead = leadRows[0];
 
+    // Step 3: Validate state — must be 'assigned' (not already accepted/timed-out)
     if (lead.status !== 'assigned') {
-      await client.query('ROLLBACK');
-      console.error(`[applyWorkerResponse] lead ${leadId} status="${lead.status}", expected "assigned"`);
+      console.error(JSON.stringify({
+        event:    '[lead:assignment] applyWorkerResponse unexpected status',
+        leadId,
+        workerId,
+        status:   lead.status,
+        expected: 'assigned',
+        timestamp: new Date().toISOString(),
+      }));
       const err = new Error(`Lead is not in "assigned" state (current: "${lead.status}")`);
       err.statusCode = 409;
-      err.code = 'INVALID_TRANSITION';
+      err.code       = 'INVALID_TRANSITION';
+      err.leadStatus = lead.status;
       throw err;
     }
 
+    // Step 4: Verify this worker is the one assigned (not a stale/replayed callback)
     if (lead.worker_id !== workerId) {
-      await client.query('ROLLBACK');
-      console.error(`[applyWorkerResponse] lead ${leadId} worker mismatch: assigned=${lead.worker_id}, caller=${workerId}`);
+      console.error(JSON.stringify({
+        event:          '[lead:assignment] applyWorkerResponse worker mismatch',
+        leadId,
+        workerId,
+        assignedWorker: lead.worker_id,
+        timestamp:      new Date().toISOString(),
+      }));
       const err = new Error('This lead is no longer assigned to you');
       err.statusCode = 409;
+      err.code       = 'LEAD_NOT_YOURS';
       throw err;
     }
 
+    // Step 5a: ACCEPT
     if (action === 'accept') {
       assertTransition(lead.status, 'accepted');
+
       await client.query(
-        `UPDATE leads SET status = 'accepted', updated_at = NOW() WHERE id = $1`, [leadId]
+        `UPDATE leads SET status = 'accepted', updated_at = NOW() WHERE id = $1`,
+        [leadId]
       );
       await client.query(
-        `UPDATE lead_assignments SET status = 'accepted'
-         WHERE lead_id = $1 AND worker_id = $2 AND status = 'sent'`,
+        `UPDATE lead_assignments
+         SET    status = 'accepted', responded_at = NOW()
+         WHERE  lead_id = $1 AND worker_id = $2 AND status = 'sent'`,
         [leadId, workerId]
       );
-      await client.query('COMMIT');
-      log('lead_assigned', leadId, workerId); // accepted = still same worker
 
-    } else {
+      // ── COMMIT ─────────────────────────────────────────────────────────
       await client.query('COMMIT');
+      committed = true;
+      log('lead_accepted', leadId, workerId);
+
+    // Step 5b: REJECT — commit the verification lock; reassignLead runs post-commit
+    } else {
+      // ── COMMIT (verification only, no state changes) ───────────────────
+      // reassignLead() is responsible for marking lead_assignments as rejected,
+      // updating leads.status, and finding the next worker.
+      await client.query('COMMIT');
+      committed   = true;
+      doReassign  = true;
       log('lead_rejected', leadId, workerId);
-      await reassignLead(leadId, 'rejected');
     }
 
   } catch (err) {
-    try { await client.query('ROLLBACK'); } catch (_) {}
-    console.error(`[applyWorkerResponse] lead ${leadId} action="${action}":`, err.message);
+    // Only ROLLBACK when the transaction is still open (before COMMIT).
+    // Attempting ROLLBACK after COMMIT is a no-op on the wire but masks bugs.
+    if (!committed) {
+      try { await client.query('ROLLBACK'); } catch (_) { /* ignore release errors */ }
+    }
+    console.error(JSON.stringify({
+      event:     '[lead:assignment] applyWorkerResponse failed',
+      leadId,
+      workerId,
+      action,
+      error:     err.message,
+      code:      err.code ?? null,
+      timestamp: new Date().toISOString(),
+    }));
     throw err;
+
   } finally {
+    // Always release the client back to the pool before reassignment,
+    // which opens its own connection.
     client.release();
+  }
+
+  // ── Post-commit: reassignment (reject path only) ────────────────────────
+  // Runs in its own transaction via a fresh pool client.
+  // Any error here propagates to the caller (handleReject) which logs it
+  // and sends an appropriate answerCallbackQuery.
+  if (doReassign) {
+    await reassignLead(leadId, 'rejected');
   }
 }
 
@@ -756,4 +870,11 @@ async function rejectLead(workerId, leadId) {
   }
 }
 
-module.exports = { assignLead, reassignLead, applyWorkerResponse, acceptLead, rejectLead };
+module.exports = {
+  assignLead,
+  reassignLead,
+  applyWorkerResponse,
+  acceptLead,
+  rejectLead,
+  verifyWorkerTelegramIdentity,
+};

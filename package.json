@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "telegram:setup": "node scripts/telegram-setup.js",
+    "telegram:webhook:info": "node scripts/telegram-webhook-info.js"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
