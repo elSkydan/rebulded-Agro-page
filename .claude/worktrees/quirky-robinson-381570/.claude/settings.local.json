@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm \"C:/Users/Agent005/Desktop/agroagriggator_v2/telegram.js\")",
+      "Bash(git fetch *)",
+      "Bash(where gh *)",
+      "Read(//c/Users/Agent005/AppData/Local/Programs//**)",
+      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue)",
+      "Read(//c/Users/Agent005/.git/worktrees/quirky-robinson-381570/**)",
+      "Read(//c/Users/Agent005/.git/**)",
+      "Bash(git reset *)",
+      "Bash(node --check \"C:/Users/Agent005/Desktop/agroagriggator_v2/server/services/telegramService.js\")",
+      "Bash(node --check \"C:/Users/Agent005/Desktop/agroagriggator_v2/server/services/assignmentService.js\")",
+      "Bash(cp \"C:/Users/Agent005/Desktop/agroagriggator_v2/server/services/telegramService.js\" server/services/telegramService.js)",
+      "Bash(cp \"C:/Users/Agent005/Desktop/agroagriggator_v2/server/services/assignmentService.js\" server/services/assignmentService.js)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(cp \"C:/Users/Agent005/Desktop/agroagriggator_v2/server/routes/telegram.js\" server/routes/telegram.js)",
+      "PowerShell($t = [CredMgr]::Get\\(\"git:https://github.com\"\\); Write-Host $t)"
+    ]
+  }
+}
