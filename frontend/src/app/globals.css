@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+/* ========================================
+   DESIGN TOKENS (mirrors legacy tailwind.config)
+======================================== */
+@theme {
+  --color-primary: #3e7b31;
+  --color-primary-dark: #2d5c23;
+  --color-primary-light: #4e9a3d;
+  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Fixed navbar is 64px tall — keep anchor targets below it */
+section[id] {
+  scroll-margin-top: 4rem;
+}
+
+/* ========================================
+   NAVBAR
+======================================== */
+#navbar {
+  background: transparent;
+}
+
+#navbar.scrolled {
+  background: rgba(15, 20, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+.navbar-cta {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.navbar-cta:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* ========================================
+   HERO
+======================================== */
+.hero-bg {
+  background-color: #1a2a18;
+  background-image: url("https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1800&q=85");
+  background-size: cover;
+  background-position: center 40%;
+  background-repeat: no-repeat;
+}
+
+.hero-overlay {
+  background: linear-gradient(
+    105deg,
+    rgba(10, 16, 8, 0.8) 0%,
+    rgba(10, 16, 8, 0.65) 50%,
+    rgba(10, 16, 8, 0.45) 100%
+  );
+}
+
+.hero-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.hero-card:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* ========================================
+   SERVICE CARDS
+======================================== */
+.service-card {
+  cursor: default;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.service-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* ========================================
+   BEFORE/AFTER CARDS
+======================================== */
+.before-after-card {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.before-after-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+.ba-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ba-after {
+  transition: opacity 0.5s ease;
+}
+
+.ba-label {
+  transition: background 0.2s;
+}
+
+/* ========================================
+   FORM ELEMENTS
+======================================== */
+input[type="text"],
+input[type="tel"],
+input[type="number"],
+select,
+textarea {
+  font-family: inherit;
+}
+
+select option {
+  padding: 8px;
+}
+
+/* Calculator — live price emphasis */
+.calc-price-display {
+  display: inline-block;
+  transition: transform 0.35s ease, opacity 0.35s ease, color 0.35s ease;
+}
+
+.calc-price-display--pulse {
+  animation: calcPriceBump 0.5s ease;
+}
+
+@keyframes calcPriceBump {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  35% {
+    transform: scale(1.07);
+    opacity: 0.88;
+    color: #2d5c23;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   FOCUS VISIBLE
+======================================== */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
