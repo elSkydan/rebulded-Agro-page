@@ -7,9 +7,11 @@ require('dotenv').config();
 const { validateEnv } = require('./config/validateEnv');
 validateEnv();
 
-const express    = require('express');
-const app        = express();
-const pool       = require('./db/pool');
+const express       = require('express');
+const swaggerUi     = require('swagger-ui-express');
+const swaggerSpec   = require('./server/swagger');
+const app           = express();
+const pool          = require('./db/pool');
 
 const leadsRoute    = require('./server/routes/leads');
 const workersRoute  = require('./server/routes/workers');
@@ -58,6 +60,18 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   next();
 });
+
+// ---------------------------------------------------------------------------
+// Swagger UI
+// ---------------------------------------------------------------------------
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: 'Lead Distribution API Docs',
+  swaggerOptions: { persistAuthorization: true },
+}));
+
+// Raw OpenAPI spec (for external tooling, Postman import, etc.)
+app.get('/api-docs.json', (req, res) => res.json(swaggerSpec));
 
 // ---------------------------------------------------------------------------
 // Routes
