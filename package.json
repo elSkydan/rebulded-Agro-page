@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "Field cultivation lead distribution system",
   "main": "server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
+    "db:migrate": "node scripts/migrate.js",
     "telegram:setup": "node scripts/telegram-setup.js",
     "telegram:webhook:info": "node scripts/telegram-webhook-info.js"
   },

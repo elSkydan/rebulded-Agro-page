@@ -1,16 +1,5 @@
 'use strict';
 
-const path = require('path');
-
-const originalResolve = path.resolve;
-
-path.resolve = function (...args) {
-  if (args.includes(null) || args.includes(undefined)) {
-    console.error('💥 NULL PATH DETECTED:', args);
-  }
-  return originalResolve.apply(this, args);
-};
-
 require('dotenv').config();
 
 // Fail-fast: validate all required env vars before any service initialises.
@@ -63,15 +52,6 @@ app.use((req, res, next) => {
 // ---------------------------------------------------------------------------
 
 app.use(express.json());
-
-// Раздаем все файлы из корня (index.html, стили, скрипты)
-//app.use(express.static(path.join(__dirname, '/')));
-//app.use(express.static(path.resolve(__dirname)));
-app.use(express.static(__dirname));
-// Маршрут для главной страницы
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');

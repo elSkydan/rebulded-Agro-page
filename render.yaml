@@ -1,0 +1,81 @@
+# render.yaml — Render Infrastructure as Code
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploys:
+#   1. lead-distribution-db  — managed PostgreSQL 16
+#   2. lead-distribution-api — Node.js Express backend
+#
+# First deploy checklist:
+#   1. Push this file to your repo.
+#   2. In Render Dashboard → New → Blueprint, point to this repo.
+#   3. Fill in the required secret env vars marked with `sync: false`:
+#        TELEGRAM_BOT_TOKEN, ADMIN_CHAT_ID, ADMIN_TOKEN,
+#        PUBLIC_BASE_URL (your Render service URL, e.g. https://lead-distribution-api.onrender.com),
+#        CORS_ORIGIN (your deployed frontend URL).
+#   4. After first deploy: run `npm run telegram:setup` locally
+#      (or via Render Shell) to register the Telegram webhook.
+
+databases:
+  - name: lead-distribution-db
+    databaseName: lead_distribution
+    user: lead_distribution
+    plan: free
+    region: frankfurt
+
+services:
+  - type: web
+    name: lead-distribution-api
+    runtime: node
+    plan: free
+    region: frankfurt
+
+    # Pin Node.js version explicitly.
+    # Must match the `engines.node` field in package.json.
+    buildFilter:
+      ignoredPaths:
+        - frontend/**
+        - docs/**
+
+    buildCommand: npm ci --omit=dev
+
+    # Runs schema migration before new instance goes live (zero-downtime).
+    preDeployCommand: node scripts/migrate.js
+
+    startCommand: node server.js
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Automatically wired to the managed PostgreSQL above.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lead-distribution-db
+          property: connectionString
+
+      # --- Secrets: fill these in Render Dashboard ---
+
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+
+      - key: ADMIN_CHAT_ID
+        sync: false
+
+      # Optional — falls back to ADMIN_CHAT_ID when absent.
+      - key: ADMIN_LOG_CHANNEL
+        sync: false
+
+      - key: ADMIN_TOKEN
+        sync: false
+
+      # Public HTTPS URL of this service (used to register Telegram webhook).
+      # Example: https://lead-distribution-api.onrender.com
+      - key: PUBLIC_BASE_URL
+        sync: false
+
+      # Comma-separated list of allowed frontend origins.
+      # Example: https://your-frontend.onrender.com
+      - key: CORS_ORIGIN
+        sync: false
