@@ -1,0 +1,20 @@
+# Environment — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
