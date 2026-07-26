@@ -38,10 +38,9 @@ services:
 
     buildCommand: npm ci --omit=dev
 
-    # Runs schema migration before new instance goes live (zero-downtime).
-    preDeployCommand: node scripts/migrate.js
-
-    startCommand: node server.js
+    # Migration runs before the server starts on every deploy.
+    # schema.sql is idempotent — safe to run on every startup.
+    startCommand: node scripts/migrate.js && node server.js
 
     healthCheckPath: /health
 
