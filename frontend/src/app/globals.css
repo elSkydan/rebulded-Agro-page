@@ -56,10 +56,10 @@ section[id] {
 ======================================== */
 .hero-bg {
   background-color: #1a2a18;
-  background-image: url("https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1800&q=85");
-  background-size: cover;
-  background-position: center 40%;
-  background-repeat: no-repeat;
+}
+
+.hero-bg img {
+  object-position: center 40%;
 }
 
 .hero-overlay {

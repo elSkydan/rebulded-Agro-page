@@ -274,7 +274,7 @@ curl "https://api.telegram.org/bot{TOKEN}/deleteWebhook"
 
 - [ ] All placeholder values in `.env` replaced with real values
 - [ ] `ADMIN_TOKEN` is a strong random secret (32+ chars)
-- [ ] Database password is strong and not `SkydG1488!`
+- [ ] Database password is strong and not a known/default value
 - [ ] HTTPS enabled on all endpoints
 - [ ] Telegram webhook registered and verified
 - [ ] `db/schema.sql` applied to production DB

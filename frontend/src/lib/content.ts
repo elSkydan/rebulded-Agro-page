@@ -134,7 +134,7 @@ export const BEFORE_AFTER_ITEMS: BeforeAfterItem[] = [
     title: 'Покос трави',
     subtitle: 'Висока трава → акуратний газон',
     beforeImage:
-      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80',
+      'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=600&q=80',
     afterImage:
       'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
   },
@@ -142,15 +142,33 @@ export const BEFORE_AFTER_ITEMS: BeforeAfterItem[] = [
     title: 'Підготовка ділянки',
     subtitle: 'Неприбрана земля → готові грядки',
     beforeImage:
-      'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80',
+      'https://images.unsplash.com/photo-1592841200221-a6898f307baa?w=600&q=80',
     afterImage:
-      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80',
+      'https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?w=600&q=80',
+  },
+];
+
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+export const FAQ_ITEMS: FaqItem[] = [
+  {
+    question: 'А що, якщо тракторист не приїде?',
+    answer:
+      'Кожна заявка в нашій системі автоматично закріплюється за конкретним спеціалістом. Якщо він не підтверджує виїзд вчасно — заявка миттєво й автоматично переходить до наступного вільного виконавця, без вашої участі й без втрати часу. Ви нічого не платите наперед: оплата — тільки після виконання роботи, тож фінансового ризику для вас немає в будь-якому разі.',
+  },
+  {
+    question: 'А що, якщо виконають роботу неякісно?',
+    answer:
+      'Перед виїздом ми безкоштовно узгоджуємо з вами обсяг і особливості ділянки, щоб уникнути непорозумінь. Результат ви оцінюєте на місці одразу після завершення робіт — оплата відбувається тільки після того, як вас все влаштувало. Якщо виникають спірні моменти — звертайтесь напряму, ми на зв’язку і вирішуємо такі питання оперативно.',
   },
 ];
 
 export const NAV_LINKS = [
-  { href: '#services', label: 'Послуги' },
-  { href: '#works', label: 'Роботи' },
-  { href: '#how', label: 'Як ми працюємо' },
-  { href: '#pricing', label: 'Ціни' },
+  { href: '/services', label: 'Послуги' },
+  { href: '/works', label: 'Роботи' },
+  { href: '/pricing', label: 'Ціни' },
+  { href: '/contacts', label: 'Контакти' },
 ];

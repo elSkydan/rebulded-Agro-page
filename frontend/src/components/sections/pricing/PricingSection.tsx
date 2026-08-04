@@ -31,9 +31,9 @@ export function PricingSection() {
           <span className="inline-block bg-gray-100 text-gray-600 text-sm font-medium px-4 py-1.5 rounded-full mb-4">
             Ціни та заявка
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
             Розрахуйте вартість і залиште заявку
-          </h2>
+          </h1>
           <p className="text-gray-500">
             Оберіть послугу, вкажіть площу — і одразу залишайте заявку.
             <br className="hidden sm:block" />

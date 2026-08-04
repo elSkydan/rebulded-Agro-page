@@ -69,7 +69,7 @@ function buildLeadText(leadId, lead) {
     `👤 <b>Client:</b> ${lead.name}`,
     `📞 <b>Phone:</b> ${lead.phone_normalized}`,
     `🛠 <b>Service:</b> ${serviceLabel}`,
-    `📐 <b>Area:</b> ${lead.area} m²`,
+    `📐 <b>Area:</b> ${lead.area} sotka`,
     `🌆 <b>City:</b> ${lead.city_name ?? lead.city_id}`,
   ];
 

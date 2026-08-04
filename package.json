@@ -1,7 +1,7 @@
 {
-  "name": "lead-distribution",
+  "name": "agro-aggregator",
   "version": "1.0.0",
-  "description": "Field cultivation lead distribution system",
+  "description": "Field cultivation agro aggregator system",
   "main": "server.js",
   "engines": {
     "node": ">=20.0.0"

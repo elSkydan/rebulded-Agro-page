@@ -130,7 +130,7 @@ const doc = new Document({
         hr(['Done','Check'],[1200,7826]),
         dr(['[ ]','All placeholder values in .env replaced with real values'],[1200,7826]),
         dr(['[ ]','ADMIN_TOKEN is a strong random secret (32+ chars)'],[1200,7826],'E9F1F7'),
-        dr(['[ ]','Database password is strong (not the default SkydG1488!)'],[1200,7826]),
+        dr(['[ ]','Database password is strong (not a known/default value)'],[1200,7826]),
         dr(['[ ]','HTTPS enabled on all endpoints'],[1200,7826],'E9F1F7'),
         dr(['[ ]','Telegram webhook registered and verified'],[1200,7826]),
         dr(['[ ]','db/schema.sql applied to production database'],[1200,7826],'E9F1F7'),
