@@ -12,7 +12,7 @@ Host:     localhost
 Port:     5432
 Database: lead_distribution
 User:     postgres
-Password: SkydG1488!  ⚠️ CHANGE BEFORE PRODUCTION
+Password: <local-dev-password>  ⚠️ CHANGE BEFORE PRODUCTION
 ```
 
 Connection via `pg` Pool (`db/pool.js` — not yet created):

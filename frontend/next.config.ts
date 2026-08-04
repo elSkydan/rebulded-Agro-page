@@ -11,6 +11,17 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
+  // Temporary source for placeholder photography until real work photos
+  // replace them — remove this remote pattern once images are self-hosted.
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
+  },
+
   // Proxy browser requests to the Express backend so the frontend and API
   // share one origin (no CORS). BACKEND_URL is read at server start,
   // so the same build works in any environment.

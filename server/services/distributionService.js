@@ -3,7 +3,7 @@
 /**
  * distributionService.js
  *
- * Fan-out lead distribution: sends one lead to up to BATCH_SIZE workers
+ * Fan-out agro aggregator: sends one lead to up to BATCH_SIZE workers
  * simultaneously.  The first worker to accept wins; all others are rejected.
  *
  * Contract

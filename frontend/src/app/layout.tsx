@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { GoogleAnalytics } from '@next/third-parties/google';
 import { siteConfig } from '@/lib/config';
 import './globals.css';
 
@@ -52,6 +53,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  themeColor: '#3e7b31',
 };
 
 /** LocalBusiness structured data for rich search results. */
@@ -62,10 +64,11 @@ function JsonLd() {
     name: siteConfig.name,
     description: siteConfig.description,
     url: siteConfig.url,
+    image: `${siteConfig.url}/opengraph-image`,
     telephone: siteConfig.phone,
     priceRange: '₴₴',
     openingHours: 'Mo-Su 07:00-20:00',
-    areaServed: { '@type': 'City', name: 'Kyiv' },
+    areaServed: { '@type': 'Country', name: 'Ukraine' },
     makesOffer: [
       { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Вспашка і культивація' } },
       { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Обробка целини' } },
@@ -83,6 +86,10 @@ function JsonLd() {
   );
 }
 
+// Set on Render (frontend service) once you have a GA4 property. Left unset,
+// no analytics script is injected at all — safe to deploy either way.
+const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -93,6 +100,7 @@ export default function RootLayout({
       <body className="font-sans bg-white text-gray-900 antialiased">
         <JsonLd />
         {children}
+        {GA_MEASUREMENT_ID && <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />}
       </body>
     </html>
   );

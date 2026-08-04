@@ -11,7 +11,7 @@ export function Services() {
           <span className="inline-block bg-white border border-gray-200 text-gray-600 text-sm font-medium px-4 py-1.5 rounded-full mb-4">
             Послуги
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Що ми робимо</h2>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Що ми робимо</h1>
           <p className="text-gray-500 text-base sm:text-lg">
             Виконуємо роботи потужним дизельним мотоблоком 12 л.с.
           </p>
@@ -34,7 +34,7 @@ export function Services() {
               <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-4">
                 <service.icon className="w-6 h-6 text-white" aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">{service.title}</h3>
+              <h2 className="text-lg font-bold text-gray-900 mb-2">{service.title}</h2>
               <p className="text-gray-500 text-sm leading-relaxed mb-4">{service.description}</p>
               <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                 <span className="text-primary font-bold text-lg">{service.price}</span>

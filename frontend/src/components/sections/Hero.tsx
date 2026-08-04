@@ -1,3 +1,5 @@
+import Image from 'next/image';
+import Link from 'next/link';
 import { ChevronDown, MapPin, Phone } from 'lucide-react';
 import { HERO_CARDS } from '@/lib/content';
 import { siteConfig } from '@/lib/config';
@@ -7,6 +9,14 @@ export function Hero() {
     <section id="hero" className="relative min-h-screen flex items-center overflow-hidden">
       {/* Background */}
       <div className="hero-bg absolute inset-0">
+        <Image
+          src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1800&q=85"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
         <div className="hero-overlay absolute inset-0"></div>
       </div>
 
@@ -21,7 +31,7 @@ export function Hero() {
 
         {/* Heading */}
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-4 max-w-2xl">
-          Вспашка, <span className="text-primary-light">целина</span> і
+          Вспашка, <span className="text-primary-light">целина</span> і{' '}
           <br />
           покос
         </h1>
@@ -56,12 +66,12 @@ export function Hero() {
             <Phone className="w-5 h-5" aria-hidden="true" />
             Зателефонувати зараз
           </a>
-          <a
-            href="#pricing"
+          <Link
+            href="/pricing"
             className="inline-flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm border border-white/30 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200"
           >
             Розрахувати ціну
-          </a>
+          </Link>
         </div>
       </div>
 

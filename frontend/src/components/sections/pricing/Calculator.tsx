@@ -71,7 +71,7 @@ export function Calculator({
       <div className="bg-primary px-6 py-4 flex items-center gap-3">
         <CalculatorIcon className="w-5 h-5 text-white" aria-hidden="true" />
         <div>
-          <h3 className="text-white font-semibold">Калькулятор вартості</h3>
+          <h2 className="text-white font-semibold">Калькулятор вартості</h2>
           <p className="text-white/70 text-xs">Оберіть послугу і площу</p>
         </div>
       </div>

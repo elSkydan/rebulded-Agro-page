@@ -101,7 +101,7 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
       <div className="bg-primary-dark px-6 py-4 flex items-center gap-3">
         <Send className="w-5 h-5 text-white" aria-hidden="true" />
         <div>
-          <h3 className="text-white font-semibold">Залишити заявку</h3>
+          <h2 className="text-white font-semibold">Залишити заявку</h2>
           <p className="text-white/70 text-xs">Передзвонимо протягом 15 хвилин</p>
         </div>
       </div>
@@ -251,8 +251,8 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
 
             <p className="text-center text-gray-400 text-xs mt-3">
               Або зателефонуйте прямо зараз:{' '}
-              <a href={`tel:${siteConfig.phoneAlt}`} className="text-primary font-medium hover:underline">
-                {siteConfig.phoneAltDisplay}
+              <a href={`tel:${siteConfig.phone}`} className="text-primary font-medium hover:underline">
+                {siteConfig.phoneDisplay}
               </a>
             </p>
           </form>
