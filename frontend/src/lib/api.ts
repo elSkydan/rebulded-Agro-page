@@ -60,7 +60,7 @@ export async function createLead(
     });
   } catch {
     throw new ApiError(
-      'Немає звʼязку з сервером. Перевірте інтернет або спробуйте пізніше.',
+      "Немає зв'язку з сервером. Перевірте інтернет або спробуйте пізніше.",
       0,
       'NETWORK_ERROR',
     );
@@ -92,7 +92,7 @@ export async function fetchPublicCities(): Promise<PublicCity[]> {
   try {
     res = await fetch('/api/cities/public', { method: 'GET' });
   } catch {
-    throw new ApiError('Немає звʼязку з сервером.', 0, 'NETWORK_ERROR');
+    throw new ApiError("Немає зв'язку з сервером.", 0, 'NETWORK_ERROR');
   }
 
   const data = await readJsonSafe(res);

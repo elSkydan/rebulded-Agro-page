@@ -63,7 +63,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     icon: Shovel,
     title: 'Обробка целини',
     description:
-      'Обробка целини можлива будь-якої пори, навіть взимку при плюсових температурах. Перетворимо запущену ділянку на готовий ґрунт під посадку.',
+      'Обробка целини можлива будь-якої пори, навіть взимку за плюсової температури. Перетворимо запущену ділянку на готовий ґрунт під посадку.',
     price: 'від 600 грн',
     slug: 'tsilyna',
   },
@@ -80,7 +80,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     title: 'Буріння лунок',
     description:
       'Буріння лунок мотобуром діаметром до 250 мм. Ідеально для встановлення паль, посадки дерев та будь-яких інших потреб.',
-    price: 'від 100 грн/лунка',
+    price: 'від 100 грн/лунку',
     slug: 'burinnya',
   },
   {
@@ -102,7 +102,7 @@ export interface HeroCard {
 export const HERO_CARDS: HeroCard[] = [
   { icon: Truck, label: 'Транспорт', value: 'Nissan Primastar' },
   { icon: Settings, label: 'Мотоблок', value: 'Powercraft МБ 1012Д' },
-  { icon: Zap, label: 'Потужність', value: '12 л.с. дизель' },
+  { icon: Zap, label: 'Потужність', value: '12 к.с. дизель' },
   { icon: Navigation, label: 'Виїзд', value: 'Місто та за містом' },
 ];
 
@@ -121,7 +121,7 @@ export const WORK_STEPS: WorkStep[] = [
   {
     icon: Calculator,
     title: 'Розрахунок',
-    description: "Обговорюємо об'єм та вартість робіт — безкоштовна консультація",
+    description: "Обговорюємо обсяг та вартість робіт — безкоштовна консультація",
   },
   {
     icon: CalendarCheck,
