@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { Menu, Phone, X } from 'lucide-react';
 import { NAV_LINKS } from '@/lib/content';
 import { siteConfig } from '@/lib/config';
+import { SiteNavLink } from '@/components/layout/SiteNavLink';
 import logoIcon from '@/assets/logo-icon.png';
 import logoNavbar from '@/assets/logo-navbar.png';
 
@@ -43,13 +44,13 @@ export function Navbar() {
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-6">
             {NAV_LINKS.map((link) => (
-              <Link
+              <SiteNavLink
                 key={link.href}
                 href={link.href}
                 className="text-white/90 hover:text-white text-sm font-medium transition-colors"
               >
                 {link.label}
-              </Link>
+              </SiteNavLink>
             ))}
           </div>
 
@@ -85,14 +86,14 @@ export function Navbar() {
       >
         <div className="px-4 py-4 flex flex-col gap-3">
           {NAV_LINKS.map((link) => (
-            <Link
+            <SiteNavLink
               key={link.href}
               href={link.href}
               className="text-white/90 hover:text-white text-sm font-medium py-2"
-              onClick={() => setMenuOpen(false)}
+              onNavigate={() => setMenuOpen(false)}
             >
               {link.label}
-            </Link>
+            </SiteNavLink>
           ))}
         </div>
       </div>

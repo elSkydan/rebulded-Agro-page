@@ -24,6 +24,11 @@ export interface CreateLeadResponse {
   message: string;
 }
 
+export interface PublicCity {
+  id: number;
+  name: string;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -35,24 +40,73 @@ export class ApiError extends Error {
   }
 }
 
+async function readJsonSafe(res: Response): Promise<Record<string, unknown> | null> {
+  return res.json().catch(() => null);
+}
+
+function gatewayUnavailable(status: number): boolean {
+  return status === 502 || status === 503 || status === 504;
+}
+
 export async function createLead(
   payload: CreateLeadPayload,
 ): Promise<CreateLeadResponse> {
-  const res = await fetch('/api/leads', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await res.json().catch(() => null);
-
-  if (!res.ok) {
+  let res: Response;
+  try {
+    res = await fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
     throw new ApiError(
-      data?.error ?? `Request failed with status ${res.status}`,
-      res.status,
-      data?.code,
+      'Немає звʼязку з сервером. Перевірте інтернет або спробуйте пізніше.',
+      0,
+      'NETWORK_ERROR',
     );
   }
 
-  return data as CreateLeadResponse;
+  const data = await readJsonSafe(res);
+
+  if (!res.ok) {
+    if (gatewayUnavailable(res.status)) {
+      throw new ApiError(
+        'Сервіс заявок тимчасово недоступний. Спробуйте пізніше або зателефонуйте нам.',
+        res.status,
+        'BAD_GATEWAY',
+      );
+    }
+    throw new ApiError(
+      typeof data?.error === 'string' ? data.error : `Request failed with status ${res.status}`,
+      res.status,
+      typeof data?.code === 'string' ? data.code : undefined,
+    );
+  }
+
+  return data as unknown as CreateLeadResponse;
+}
+
+/** Public cities for the lead-form region select. */
+export async function fetchPublicCities(): Promise<PublicCity[]> {
+  let res: Response;
+  try {
+    res = await fetch('/api/cities/public', { method: 'GET' });
+  } catch {
+    throw new ApiError('Немає звʼязку з сервером.', 0, 'NETWORK_ERROR');
+  }
+
+  const data = await readJsonSafe(res);
+
+  if (!res.ok) {
+    if (gatewayUnavailable(res.status)) {
+      throw new ApiError('Сервіс міст тимчасово недоступний.', res.status, 'BAD_GATEWAY');
+    }
+    throw new ApiError('Не вдалося завантажити список міст.', res.status);
+  }
+
+  if (!Array.isArray(data)) {
+    throw new ApiError('Некоректна відповідь списку міст.', res.status);
+  }
+
+  return data as unknown as PublicCity[];
 }

@@ -22,7 +22,7 @@ export default function ContactsPage() {
     <>
       <Navbar />
       <Breadcrumbs items={[{ label: 'Контакти' }]} />
-      <main>
+      <main className="flex-1 flex flex-col bg-gray-50">
         <Contacts />
       </main>
       <Footer />

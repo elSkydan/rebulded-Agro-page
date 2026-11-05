@@ -22,7 +22,7 @@ export default function PricingPage() {
     <>
       <Navbar />
       <Breadcrumbs items={[{ label: 'Ціни' }]} />
-      <main>
+      <main className="flex-1">
         <PricingSection />
       </main>
       <Footer />

@@ -8,7 +8,7 @@ export default function HomePage() {
   return (
     <>
       <Navbar />
-      <main>
+      <main className="flex-1">
         <Hero />
         <HowWeWork />
         <ExploreMore />

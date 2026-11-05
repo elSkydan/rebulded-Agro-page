@@ -22,7 +22,7 @@ export default function WorksPage() {
     <>
       <Navbar />
       <Breadcrumbs items={[{ label: 'Наші роботи' }]} />
-      <main>
+      <main className="flex-1 flex flex-col bg-gray-50">
         <Works />
       </main>
       <Footer />

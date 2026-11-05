@@ -16,14 +16,23 @@ import {
 } from 'lucide-react';
 import type { ServiceType } from './pricing';
 
-/** Options shared by the calculator select and the lead-form select. */
+/** Options shared by the calculator select and the lead-form select.
+ *  Keep labels short — long option text overflows native selects on mobile. */
 export const SERVICE_OPTIONS: { value: ServiceType; label: string }[] = [
-  { value: 'ogorod', label: '🌾 Огород / вспашка — від 300 грн/сот.' },
-  { value: 'celina', label: '🌿 Цілина — від 600 грн/сот.' },
-  { value: 'mowing', label: '🌺 Покос трави — 200 грн/сот. (фрезами)' },
-  { value: 'tree', label: '🌳 Демонтаж дерева — від 500 грн' },
-  { value: 'washing', label: '🚿 Мийка техніки — від 250 грн' },
+  { value: 'ogorod', label: 'Огород / вспашка' },
+  { value: 'celina', label: 'Цілина' },
+  { value: 'mowing', label: 'Покос трави' },
+  { value: 'tree', label: 'Демонтаж дерева' },
+  { value: 'washing', label: 'Мийка техніки' },
 ];
+
+/** Names that identify the currently active service region (Kharkiv). */
+export const ACTIVE_REGION_NAMES = ['харків', 'харьков', 'kharkiv', 'kharkov'] as const;
+
+export function isActiveRegion(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return ACTIVE_REGION_NAMES.some((n) => normalized === n || normalized.includes(n));
+}
 
 export interface ServiceCard {
   icon: LucideIcon;

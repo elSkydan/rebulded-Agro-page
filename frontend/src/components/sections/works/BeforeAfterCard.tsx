@@ -39,14 +39,6 @@ export function BeforeAfterCard({ item }: BeforeAfterCardProps) {
             sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
             className={`ba-after absolute inset-0 object-cover ${showAfter ? 'opacity-100' : 'opacity-0'}`}
           />
-          <span className="absolute top-3 left-3">
-            <span className="ba-label bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-              ← До
-            </span>
-          </span>
-          <span className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full whitespace-nowrap">
-            Натисніть для порівняння
-          </span>
         </button>
         <div className="flex border-t border-gray-100">
           <button
