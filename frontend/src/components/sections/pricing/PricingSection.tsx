@@ -1,9 +1,23 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { minAreaForService, type ServiceType } from '@/lib/pricing';
 import { Calculator } from './Calculator';
 import { LeadForm } from './LeadForm';
+
+const SERVICE_TYPES: ReadonlySet<string> = new Set([
+  'ogorod',
+  'celina',
+  'mowing',
+  'tree',
+  'washing',
+]);
+
+function parseServiceParam(raw: string | null): ServiceType | null {
+  if (!raw || !SERVICE_TYPES.has(raw)) return null;
+  return raw as ServiceType;
+}
 
 /**
  * Owns the state shared between the calculator and the lead form:
@@ -11,10 +25,21 @@ import { LeadForm } from './LeadForm';
  * mirrors the selected service (user can still override it).
  */
 export function PricingSection() {
-  const [service, setService] = useState<ServiceType>('ogorod');
-  const [areaInput, setAreaInput] = useState<string>(String(minAreaForService('ogorod')));
+  const searchParams = useSearchParams();
+  const initial = parseServiceParam(searchParams.get('service')) ?? 'ogorod';
+
+  const [service, setService] = useState<ServiceType>(initial);
+  const [areaInput, setAreaInput] = useState<string>(String(minAreaForService(initial)));
   const [outOfCity, setOutOfCity] = useState(false);
-  const [formService, setFormService] = useState<ServiceType>('ogorod');
+  const [formService, setFormService] = useState<ServiceType>(initial);
+
+  useEffect(() => {
+    const fromQuery = parseServiceParam(searchParams.get('service'));
+    if (!fromQuery) return;
+    setService(fromQuery);
+    setFormService(fromQuery);
+    setAreaInput(String(minAreaForService(fromQuery)));
+  }, [searchParams]);
 
   const handleServiceChange = useCallback((next: ServiceType) => {
     setService(next);

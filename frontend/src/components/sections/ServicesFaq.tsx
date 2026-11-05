@@ -1,5 +1,6 @@
 import { HelpCircle } from 'lucide-react';
 import { FAQ_ITEMS } from '@/lib/content';
+import { jsonLdScript } from '@/lib/seo';
 
 /** FAQ block for /services — also emits FAQPage JSON-LD for rich results. */
 export function ServicesFaq() {
@@ -20,7 +21,7 @@ export function ServicesFaq() {
     <section className="py-16 sm:py-20 bg-white">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(schema) }}
       />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">

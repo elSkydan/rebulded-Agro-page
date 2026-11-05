@@ -11,9 +11,10 @@ export function Hero() {
       <div className="hero-bg absolute inset-0">
         <Image
           src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1800&q=85"
-          alt=""
+          alt="Агророботи мотоблоком у Харкові — вспашка та підготовка ділянки"
           fill
           priority
+          fetchPriority="high"
           sizes="100vw"
           className="object-cover"
         />
@@ -25,7 +26,7 @@ export function Hero() {
         <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
           <MapPin className="w-4 h-4 text-primary-light" aria-hidden="true" />
           <span className="text-white text-sm font-medium">
-            Виїзд сьогодні · Будь-який район
+            Харків · виїзд сьогодні
           </span>
         </div>
 
@@ -33,13 +34,14 @@ export function Hero() {
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-4 max-w-2xl">
           Вспашка, <span className="text-primary-light">целина</span> і{' '}
           <br />
-          покос
+          покос у Харкові
         </h1>
 
         {/* Subtitle */}
         <p className="text-white/80 text-base sm:text-lg mb-8 max-w-md">
           Приїдемо вже сьогодні на <strong className="text-white">Nissan Primastar</strong> з
-          дизельним мотоблоком <strong className="text-white">Powercraft МБ 1012Д</strong>
+          дизельним мотоблоком <strong className="text-white">Powercraft МБ 1012Д</strong>. Працюємо
+          по Харкову та області.
         </p>
 
         {/* Info Cards */}

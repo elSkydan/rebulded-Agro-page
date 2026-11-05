@@ -3,6 +3,12 @@ import { ArrowRight, Images, MapPinned, Wallet, Wrench } from 'lucide-react';
 
 const TILES = [
   {
+    icon: MapPinned,
+    title: 'Харків',
+    description: 'Послуги в активному регіоні — вспашка, целина, покос',
+    href: '/kharkiv',
+  },
+  {
     icon: Wrench,
     title: 'Послуги',
     description: 'Вспашка, цілина, покос, буріння, мийка техніки',
@@ -19,12 +25,6 @@ const TILES = [
     title: 'Ціни',
     description: 'Калькулятор вартості та заявка онлайн',
     href: '/pricing',
-  },
-  {
-    icon: MapPinned,
-    title: 'Контакти',
-    description: 'Телефон, графік роботи, зона виїзду',
-    href: '/contacts',
   },
 ];
 
