@@ -27,11 +27,14 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
     })),
   };
 
+  // Local import avoids a circular pull if seo ever imports layout helpers.
+  const payload = JSON.stringify(schema).replace(/</g, '\\u003c');
+
   return (
     <nav aria-label="Хлібні крихти" className="bg-gray-50 border-b border-gray-100 pt-16">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        dangerouslySetInnerHTML={{ __html: payload }}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-1.5 text-sm text-gray-500 overflow-x-auto">
         {trail.map((item, index) => {

@@ -39,6 +39,8 @@ export interface ServiceCard {
   title: string;
   description: string;
   price: string;
+  /** SEO landing under /services/[slug] */
+  slug: string;
   badge?: string;
 }
 
@@ -49,6 +51,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Обробка огородів та присадибних ділянок потужним дизельним мотоблоком. Ширина захвату фрези 1 м, глибина культивації до 18 см, вспашки до 25–30 см.',
     price: 'від 300 грн',
+    slug: 'vspashka',
     badge: 'Популярно',
   },
   {
@@ -57,6 +60,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Обробка целини можлива будь-якої пори, навіть взимку при плюсових температурах. Перетворимо запущену ділянку на готовий ґрунт під посадку.',
     price: 'від 600 грн',
+    slug: 'tsilyna',
   },
   {
     icon: Wind,
@@ -64,6 +68,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Покос трави фрезами. Швидко та якісно обробимо ділянки від 10 соток — орієнтовно за ставкою калькулятора.',
     price: 'від 200 грн/сот.',
+    slug: 'pokos',
   },
   {
     icon: Drill,
@@ -71,6 +76,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Буріння лунок мотобуром діаметром до 250 мм. Ідеально для встановлення паль, посадки дерев та будь-яких інших потреб.',
     price: 'від 100 грн/лунка',
+    slug: 'burinnya',
   },
   {
     icon: Droplets,
@@ -78,6 +84,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Мийка техніки та обладнання мобільною дизельною мийкою високого тиску 200 бар. Якісна чистка прямо у вас на ділянці.',
     price: 'від 250 грн',
+    slug: 'myjka',
   },
 ];
 

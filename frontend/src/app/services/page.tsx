@@ -6,14 +6,14 @@ import { Services } from '@/components/sections/Services';
 import { ServicesFaq } from '@/components/sections/ServicesFaq';
 
 export const metadata: Metadata = {
-  title: 'Послуги',
+  title: 'Послуги в Харкові',
   description:
-    'Вспашка і культивація городу, обробка целини, покос трави фрезами, буріння лунок мотобуром, мийка техніки під тиском. Виїзд по всій Україні, оплата після виконання роботи.',
+    'Вспашка і культивація городу, обробка целини, покос трави, буріння лунок і мийка техніки в Харкові. Виїзд сьогодні, оплата після роботи.',
   alternates: { canonical: '/services' },
   openGraph: {
-    title: 'Послуги — Agro Aggregator',
+    title: 'Послуги в Харкові — Agro Aggregator',
     description:
-      'Вспашка, культивація, обробка целини, покос трави, буріння лунок, мийка техніки. Виїзд по всій Україні.',
+      'Вспашка, культивація, обробка целини, покос трави, буріння лунок, мийка техніки в Харкові.',
     url: '/services',
     images: ['/opengraph-image'],
   },

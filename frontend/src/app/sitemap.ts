@@ -1,15 +1,23 @@
 import type { MetadataRoute } from 'next';
 import { siteConfig } from '@/lib/config';
+import { SERVICE_LANDINGS } from '@/lib/service-pages';
+import { SITE_CONTENT_UPDATED } from '@/lib/seo';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date();
+  const lastModified = SITE_CONTENT_UPDATED;
 
-  return [
+  const staticPages: MetadataRoute.Sitemap = [
     {
       url: siteConfig.url,
       lastModified,
-      changeFrequency: 'monthly',
+      changeFrequency: 'weekly',
       priority: 1,
+    },
+    {
+      url: `${siteConfig.url}/kharkiv`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.95,
     },
     {
       url: `${siteConfig.url}/pricing`,
@@ -21,7 +29,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${siteConfig.url}/services`,
       lastModified,
       changeFrequency: 'monthly',
-      priority: 0.8,
+      priority: 0.85,
     },
     {
       url: `${siteConfig.url}/works`,
@@ -36,4 +44,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
   ];
+
+  const servicePages: MetadataRoute.Sitemap = SERVICE_LANDINGS.map((service) => ({
+    url: `${siteConfig.url}/services/${service.slug}`,
+    lastModified,
+    changeFrequency: 'monthly' as const,
+    priority: 0.8,
+  }));
+
+  return [...staticPages, ...servicePages];
 }

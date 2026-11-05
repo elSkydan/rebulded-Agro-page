@@ -5,13 +5,13 @@ import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { Contacts } from '@/components/sections/Contacts';
 
 export const metadata: Metadata = {
-  title: 'Контакти',
+  title: 'Контакти — Харків',
   description:
-    'Зв\'яжіться з Agro Aggregator: телефон, графік роботи, зона обслуговування по всій Україні. Передзвонимо протягом 15 хвилин.',
+    'Зв\'яжіться з Agro Aggregator у Харкові: телефон +38 (067) 902-03-26, графік Пн–Нд 7:00–20:00. Передзвонимо протягом 15 хвилин.',
   alternates: { canonical: '/contacts' },
   openGraph: {
-    title: 'Контакти — Agro Aggregator',
-    description: 'Телефон, графік роботи і зона обслуговування Agro Aggregator.',
+    title: 'Контакти в Харкові — Agro Aggregator',
+    description: 'Телефон, графік роботи і зона обслуговування в Харкові.',
     url: '/contacts',
     images: ['/opengraph-image'],
   },
