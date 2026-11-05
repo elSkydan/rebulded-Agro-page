@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { siteConfig } from '@/lib/config';
 import { NAV_LINKS } from '@/lib/content';
+import { SiteNavLink } from '@/components/layout/SiteNavLink';
 import logoIcon from '@/assets/logo-icon.png';
 
 export function Footer() {
@@ -34,13 +35,13 @@ export function Footer() {
             Головна
           </Link>
           {NAV_LINKS.map((link) => (
-            <Link
+            <SiteNavLink
               key={link.href}
               href={link.href}
               className="text-gray-400 hover:text-white text-sm transition-colors"
             >
               {link.label}
-            </Link>
+            </SiteNavLink>
           ))}
         </nav>
 

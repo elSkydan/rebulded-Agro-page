@@ -97,7 +97,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="uk" className={inter.variable}>
-      <body className="font-sans bg-white text-gray-900 antialiased">
+      <body className="min-h-dvh flex flex-col font-sans bg-white text-gray-900 antialiased">
         <JsonLd />
         {children}
         {GA_MEASUREMENT_ID && <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />}

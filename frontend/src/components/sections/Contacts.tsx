@@ -17,13 +17,13 @@ const CONTACT_CARDS = [
   {
     icon: MapPin,
     title: 'Зона обслуговування',
-    body: 'Працюємо по всій Україні — виїзд у будь-яке місто чи село за домовленістю',
+    body: 'Зараз працюємо в регіоні Харків. Виїзд в інші міста — за домовленістю',
   },
 ];
 
 export function Contacts() {
   return (
-    <section className="py-16 sm:py-20 bg-gray-50">
+    <section className="flex-1 py-16 sm:py-20 bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <span className="inline-block bg-white border border-gray-200 text-gray-600 text-sm font-medium px-4 py-1.5 rounded-full mb-4">

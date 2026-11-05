@@ -135,8 +135,18 @@ textarea {
   font-family: inherit;
 }
 
+select {
+  max-width: 100%;
+}
+
 select option {
   padding: 8px;
+}
+
+/* Native selects inherit long option intrinsic width — keep wrappers shrinkable */
+.select-wrap {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Calculator — live price emphasis */

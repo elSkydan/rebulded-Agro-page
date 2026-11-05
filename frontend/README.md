@@ -51,9 +51,9 @@ npm run dev                  # http://localhost:3001
 
 | Змінна | Опис |
 |---|---|
-| `BACKEND_URL` | URL Express-бекенду (server-side, для проксі) |
+| `BACKEND_URL` | URL Express API для rewrite `/api/*` (server-side). Якщо не заданий або недоступний — форма заявки отримає **502**. |
 | `NEXT_PUBLIC_SITE_URL` | Публічний URL сайту (canonical, OG, sitemap) |
-| `NEXT_PUBLIC_DEFAULT_CITY_ID` | ID міста з таблиці `cities` бекенду |
+| `NEXT_PUBLIC_DEFAULT_CITY_ID` | ID міста з таблиці `cities` бекенду (fallback, якщо `/api/cities/public` недоступний). Для активного регіону в БД має бути **Харків**. |
 | `NEXT_PUBLIC_PHONE` | Телефон у форматі `tel:` |
 | `NEXT_PUBLIC_PHONE_DISPLAY` | Телефон для відображення |
 

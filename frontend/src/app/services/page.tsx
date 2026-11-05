@@ -24,7 +24,7 @@ export default function ServicesPage() {
     <>
       <Navbar />
       <Breadcrumbs items={[{ label: 'Послуги' }]} />
-      <main>
+      <main className="flex-1">
         <Services />
         <ServicesFaq />
       </main>
