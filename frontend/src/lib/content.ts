@@ -14,7 +14,12 @@ import {
   Wind,
   Zap,
 } from 'lucide-react';
+import type { StaticImageData } from 'next/image';
 import type { ServiceType } from './pricing';
+import celinaBefore from '@/assets/works/celina-before.jpg';
+import celinaAfter from '@/assets/works/celina-after.jpg';
+import pokosBefore from '@/assets/works/pokos-before.jpg';
+import pokosAfter from '@/assets/works/pokos-after.jpg';
 
 /** Options shared by the calculator select and the lead-form select.
  *  Keep labels short — long option text overflows native selects on mobile. */
@@ -133,26 +138,22 @@ export const WORK_STEPS: WorkStep[] = [
 export interface BeforeAfterItem {
   title: string;
   subtitle: string;
-  beforeImage: string;
-  afterImage: string;
+  beforeImage: string | StaticImageData;
+  afterImage: string | StaticImageData;
 }
 
 export const BEFORE_AFTER_ITEMS: BeforeAfterItem[] = [
   {
     title: 'Обробка целини',
     subtitle: 'Запущена ділянка → готовий ґрунт',
-    beforeImage:
-      'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80',
-    afterImage:
-      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80',
+    beforeImage: celinaBefore,
+    afterImage: celinaAfter,
   },
   {
     title: 'Покос трави',
     subtitle: 'Висока трава → акуратний газон',
-    beforeImage:
-      'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=600&q=80',
-    afterImage:
-      'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
+    beforeImage: pokosBefore,
+    afterImage: pokosAfter,
   },
   {
     title: 'Підготовка ділянки',
@@ -184,7 +185,7 @@ export const FAQ_ITEMS: FaqItem[] = [
 
 export const NAV_LINKS = [
   { href: '/services', label: 'Послуги' },
-  { href: '/works', label: 'Роботи' },
   { href: '/pricing', label: 'Ціни' },
+  { href: '/works', label: 'Роботи' },
   { href: '/contacts', label: 'Контакти' },
 ];

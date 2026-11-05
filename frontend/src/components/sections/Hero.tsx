@@ -31,17 +31,15 @@ export function Hero() {
         </div>
 
         {/* Heading */}
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-4 max-w-2xl">
-          Вспашка, <span className="text-primary-light">целина</span> і{' '}
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-4 max-w-2xl">
+          Якісна <span className="text-primary-light">оранка</span>,
           <br />
-          покос у Харкові
+          обробка цілини, покіс та інші господарські роботи у Харкові
         </h1>
 
         {/* Subtitle */}
         <p className="text-white/80 text-base sm:text-lg mb-8 max-w-md">
-          Приїдемо вже сьогодні на <strong className="text-white">Nissan Primastar</strong> з
-          дизельним мотоблоком <strong className="text-white">Powercraft МБ 1012Д</strong>. Працюємо
-          по Харкову та області.
+          Приїдемо вже сьогодні. Працюємо по Харкову та області.
         </p>
 
         {/* Info Cards */}
