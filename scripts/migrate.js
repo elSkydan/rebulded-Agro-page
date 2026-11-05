@@ -48,7 +48,32 @@ async function migrate() {
   console.log('[migrate] Done.');
 }
 
+function redactDatabaseTarget() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return '(DATABASE_URL not set)';
+  try {
+    const parsed = new URL(url);
+    // Show host only — never log user/password.
+    return `${parsed.protocol}//***@${parsed.hostname}:${parsed.port || '5432'}${parsed.pathname}`;
+  } catch {
+    return '(DATABASE_URL present but unparseable)';
+  }
+}
+
 migrate().catch((err) => {
   console.error('[migrate] FAILED:', err.message);
+  console.error('[migrate] Target:', redactDatabaseTarget());
+
+  const msg = String(err && err.message ? err.message : err);
+  if (err.code === 'ENOTFOUND' || /ENOTFOUND/i.test(msg)) {
+    console.error(
+      '[migrate] HINT: Postgres hostname does not resolve (DNS ENOTFOUND). ' +
+        'On Render this usually means the database was deleted/suspended, or ' +
+        'DATABASE_URL still points at an old internal host like dpg-xxxxx-a. ' +
+        'Fix: Dashboard → PostgreSQL → copy Internal Database URL → set it as ' +
+        'DATABASE_URL on the web service (or re-link fromDatabase in render.yaml) → Clear build cache & redeploy.',
+    );
+  }
+
   process.exit(1);
 });

@@ -17,4 +17,8 @@ Thumbs.db
 # IDE
 .idea/
 .vscode/
+.vs/
 *.swp
+
+# Local agent / tooling
+.claude/

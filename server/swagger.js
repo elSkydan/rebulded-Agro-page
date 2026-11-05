@@ -2,14 +2,14 @@
 
 /**
  * server/swagger.js
- * Full OpenAPI 3.0 specification for the Lead Distribution API.
+ * Full OpenAPI 3.0 specification for the Agro Aggregator API.
  * Mounted at GET /api-docs by server.js.
  */
 
 const spec = {
   openapi: '3.0.3',
   info: {
-    title: 'Lead Distribution API',
+    title: 'Agro Aggregator API',
     description:
       'API for managing agricultural service leads, workers, and cities.\n\n' +
       '**Authentication:** Admin endpoints require `Authorization: Bearer <ADMIN_TOKEN>` header.\n\n' +
@@ -221,7 +221,7 @@ const spec = {
                   name:         { type: 'string',  example: 'Olena' },
                   phone:        { type: 'string',  example: '0671234567', description: 'Any UA phone format — normalized to +380XXXXXXXXX' },
                   service_type: { $ref: '#/components/schemas/ServiceType' },
-                  area:         { type: 'number',  example: 5.5, description: 'Area in hectares (0.5 – 50)' },
+                  area:         { type: 'number',  example: 5.5, description: 'Area in sotka (0.5 – 50), rounded up to the nearest 0.5' },
                   city_id:      { type: 'integer', example: 1 },
                   out_of_city:  { type: 'boolean', default: false, description: 'Service requested outside city radius — applies extra charge' },
                   comment:      { type: 'string',  example: 'Gate code: 1234', description: 'Optional client note (max 1000 chars)' },

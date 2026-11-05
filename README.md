@@ -1,4 +1,4 @@
-# Lead Distribution — Setup & Run
+# Agro Aggregator — Setup & Run
 
 ## Prerequisites
 
@@ -140,24 +140,56 @@ curl -X PATCH http://localhost:3000/api/leads/1/cancel \
 
 ```
 /
-├── server.js               # Entry point
+├── server.js                       # Entry point: Express app, CORS, Swagger UI, boot, cron start
 ├── package.json
 ├── .env.example
+├── render.yaml                     # Render Blueprint (API + managed Postgres)
+│
 ├── config/
-│   └── config.js
+│   ├── config.js                   # All tunable constants (reads .env)
+│   └── validateEnv.js              # Fail-fast startup env validation
+│
 ├── db/
-│   ├── schema.sql
-│   └── pool.js
-└── server/
-    ├── routes/
-    │   └── leads.js
-    ├── services/
-    │   ├── assignmentService.js
-    │   ├── pricingService.js
-    │   ├── telegramService.js
-    │   └── timeoutService.js
-    └── middlewares/
-        ├── auth.js
-        ├── rateLimiter.js
-        └── validateLead.js
+│   ├── schema.sql                  # Full CREATE TABLE — idempotent, source of truth
+│   ├── pool.js                     # pg Pool singleton
+│   ├── lead_assignments.sql        # Legacy upgrade path (pre-v2 DBs only)
+│   ├── migrate_service_types.sql   # Legacy upgrade path (pre-v2 DBs only)
+│   └── add_comment_column.sql      # Legacy upgrade path (pre-v2 DBs only)
+│
+├── server/
+│   ├── routes/
+│   │   ├── leads.js                # POST /leads, GET /leads, GET /leads/:id, PATCH /leads/:id/cancel
+│   │   ├── workers.js              # Admin CRUD for workers
+│   │   ├── cities.js               # Admin CRUD for cities
+│   │   └── telegram.js             # POST /webhook (Telegram callback_query handler)
+│   ├── services/
+│   │   ├── assignmentService.js    # Worker selection, state machine, accept/reject/reassign
+│   │   ├── distributionService.js  # Fan-out multi-worker distribution — NOT wired in, kept for future use
+│   │   ├── pricingService.js       # calcPrice() — server is single source of truth
+│   │   ├── telegramService.js      # Outbound Telegram delivery layer (class-based, retries)
+│   │   └── timeoutService.js       # node-cron: reassign timed-out / stale leads
+│   ├── middlewares/
+│   │   ├── auth.js                 # Admin Bearer token check (timing-safe compare)
+│   │   ├── rateLimiter.js          # 5 req/min/IP on POST /leads
+│   │   └── validateLead.js         # Input validation + phone normalization
+│   ├── repositories/
+│   │   └── leadAssignmentRepository.js
+│   ├── utils/
+│   │   └── pgLeadError.js          # Maps PG error codes to HTTP responses
+│   └── swagger.js                  # OpenAPI 3.0 spec, served at /api-docs
+│
+├── scripts/
+│   ├── migrate.js                  # Applies db/schema.sql (idempotent)
+│   ├── telegram-setup.js           # Registers the Telegram webhook
+│   └── telegram-webhook-info.js
+│
+├── test/                           # node --test suite (services + validation)
+│
+└── frontend/                       # Next.js 16 app — multi-page site (Home, Services, Works, Pricing, Contacts)
+    └── src/
+        ├── app/                    # App Router: page.tsx (home hub) + services/, works/, pricing/, contacts/
+        ├── components/             # sections/, layout/ (incl. Breadcrumbs)
+        └── lib/                    # api.ts, pricing.ts (client-side price preview), config.ts, content.ts
 ```
+
+Note: `frontend/` is a separate Next.js app with its own `package.json`; it proxies `/api/*` to this backend (see `frontend/next.config.ts`) and is deployed independently.

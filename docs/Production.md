@@ -1,5 +1,13 @@
 # Production.md — Deployment Guide (Step-by-Step)
 
+> **Render tip (migrate ENOTFOUND):** if deploy logs show
+> `getaddrinfo ENOTFOUND dpg-xxxxx-a`, the web service `DATABASE_URL` points at a
+> Postgres hostname that no longer resolves (DB deleted, suspended, or stale
+> Internal URL). Fix in Dashboard → PostgreSQL → copy **Internal Database URL** →
+> paste as `DATABASE_URL` on the API service (or re-link `fromDatabase` in
+> `render.yaml`) → **Clear build cache & redeploy**. The Node build itself is fine;
+> startup fails before `server.js` because `scripts/migrate.js` cannot connect.
+
 ---
 
 ## 1. Prerequisites
@@ -274,7 +282,7 @@ curl "https://api.telegram.org/bot{TOKEN}/deleteWebhook"
 
 - [ ] All placeholder values in `.env` replaced with real values
 - [ ] `ADMIN_TOKEN` is a strong random secret (32+ chars)
-- [ ] Database password is strong and not `SkydG1488!`
+- [ ] Database password is strong and not a known/default value
 - [ ] HTTPS enabled on all endpoints
 - [ ] Telegram webhook registered and verified
 - [ ] `db/schema.sql` applied to production DB

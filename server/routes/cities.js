@@ -5,6 +5,27 @@ const router  = express.Router();
 const pool    = require('../../db/pool');
 const auth    = require('../middlewares/auth');
 
+// GET /api/cities/public — unauthenticated list for the lead form dropdown.
+// Kharkiv is sorted first so the landing can highlight the active region.
+router.get('/public', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name
+       FROM   cities
+       ORDER BY
+         CASE
+           WHEN LOWER(name) IN ('харків', 'харьков', 'kharkiv', 'kharkov') THEN 0
+           ELSE 1
+         END,
+         name ASC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[GET /cities/public]', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // GET /api/cities
 router.get('/', auth, async (req, res) => {
   try {

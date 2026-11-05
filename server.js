@@ -66,7 +66,7 @@ app.use((req, res, next) => {
 // ---------------------------------------------------------------------------
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customSiteTitle: 'Lead Distribution API Docs',
+  customSiteTitle: 'Agro Aggregator API Docs',
   swaggerOptions: { persistAuthorization: true },
 }));
 

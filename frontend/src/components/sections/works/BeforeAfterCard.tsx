@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import type { BeforeAfterItem } from '@/lib/content';
 
 interface BeforeAfterCardProps {
@@ -14,7 +15,7 @@ export function BeforeAfterCard({ item }: BeforeAfterCardProps) {
     <div className="before-after-card rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-white">
       <div className="relative">
         <div className="bg-primary px-4 py-3">
-          <h3 className="text-white font-semibold text-sm">{item.title}</h3>
+          <h2 className="text-white font-semibold text-sm">{item.title}</h2>
           <p className="text-white/70 text-xs">{item.subtitle}</p>
         </div>
         <button
@@ -24,27 +25,20 @@ export function BeforeAfterCard({ item }: BeforeAfterCardProps) {
           onClick={() => setShowAfter((v) => !v)}
           aria-label={showAfter ? 'Показати фото до' : 'Показати фото після'}
         >
-          {/* <span> instead of <div>: a <button> only permits phrasing content */}
-          <span
-            role="img"
-            aria-label={`${item.title} — фото до`}
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url('${item.beforeImage}')` }}
-          ></span>
-          <span
-            role="img"
-            aria-label={`${item.title} — фото після`}
-            className={`ba-after absolute inset-0 bg-cover bg-center ${showAfter ? 'opacity-100' : 'opacity-0'}`}
-            style={{ backgroundImage: `url('${item.afterImage}')` }}
-          ></span>
-          <span className="absolute top-3 left-3">
-            <span className="ba-label bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-              ← До
-            </span>
-          </span>
-          <span className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full whitespace-nowrap">
-            Натисніть для порівняння
-          </span>
+          <Image
+            src={item.beforeImage}
+            alt={`${item.title} — фото до`}
+            fill
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            className="absolute inset-0 object-cover"
+          />
+          <Image
+            src={item.afterImage}
+            alt={`${item.title} — фото після`}
+            fill
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            className={`ba-after absolute inset-0 object-cover ${showAfter ? 'opacity-100' : 'opacity-0'}`}
+          />
         </button>
         <div className="flex border-t border-gray-100">
           <button

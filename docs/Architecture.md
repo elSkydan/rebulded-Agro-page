@@ -148,7 +148,7 @@ All config via `.env`:
 
 | Variable | Purpose | Current Value |
 |----------|---------|---------------|
-| `DATABASE_URL` | PostgreSQL connection | `postgres://postgres:SkydG1488!@localhost:5432/lead_distribution` |
+| `DATABASE_URL` | PostgreSQL connection | `postgres://postgres:<password>@localhost:5432/lead_distribution` |
 | `TELEGRAM_BOT_TOKEN` | Bot API key | Placeholder |
 | `ADMIN_CHAT_ID` | Admin Telegram ID | Placeholder |
 | `ADMIN_TOKEN` | Bearer auth for admin API | Placeholder |

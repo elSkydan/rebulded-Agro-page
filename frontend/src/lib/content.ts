@@ -14,22 +14,38 @@ import {
   Wind,
   Zap,
 } from 'lucide-react';
+import type { StaticImageData } from 'next/image';
 import type { ServiceType } from './pricing';
+import celinaBefore from '@/assets/works/celina-before.jpg';
+import celinaAfter from '@/assets/works/celina-after.jpg';
+import pokosBefore from '@/assets/works/pokos-before.jpg';
+import pokosAfter from '@/assets/works/pokos-after.jpg';
 
-/** Options shared by the calculator select and the lead-form select. */
+/** Options shared by the calculator select and the lead-form select.
+ *  Keep labels short — long option text overflows native selects on mobile. */
 export const SERVICE_OPTIONS: { value: ServiceType; label: string }[] = [
-  { value: 'ogorod', label: '🌾 Огород / вспашка — від 300 грн/сот.' },
-  { value: 'celina', label: '🌿 Цілина — від 600 грн/сот.' },
-  { value: 'mowing', label: '🌺 Покос трави — 200 грн/сот. (фрезами)' },
-  { value: 'tree', label: '🌳 Демонтаж дерева — від 500 грн' },
-  { value: 'washing', label: '🚿 Мийка техніки — від 250 грн' },
+  { value: 'ogorod', label: 'Огород / вспашка' },
+  { value: 'celina', label: 'Цілина' },
+  { value: 'mowing', label: 'Покос трави' },
+  { value: 'tree', label: 'Демонтаж дерева' },
+  { value: 'washing', label: 'Мийка техніки' },
 ];
+
+/** Names that identify the currently active service region (Kharkiv). */
+export const ACTIVE_REGION_NAMES = ['харків', 'харьков', 'kharkiv', 'kharkov'] as const;
+
+export function isActiveRegion(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return ACTIVE_REGION_NAMES.some((n) => normalized === n || normalized.includes(n));
+}
 
 export interface ServiceCard {
   icon: LucideIcon;
   title: string;
   description: string;
   price: string;
+  /** SEO landing under /services/[slug] */
+  slug: string;
   badge?: string;
 }
 
@@ -40,6 +56,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Обробка огородів та присадибних ділянок потужним дизельним мотоблоком. Ширина захвату фрези 1 м, глибина культивації до 18 см, вспашки до 25–30 см.',
     price: 'від 300 грн',
+    slug: 'vspashka',
     badge: 'Популярно',
   },
   {
@@ -48,6 +65,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Обробка целини можлива будь-якої пори, навіть взимку при плюсових температурах. Перетворимо запущену ділянку на готовий ґрунт під посадку.',
     price: 'від 600 грн',
+    slug: 'tsilyna',
   },
   {
     icon: Wind,
@@ -55,6 +73,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Покос трави фрезами. Швидко та якісно обробимо ділянки від 10 соток — орієнтовно за ставкою калькулятора.',
     price: 'від 200 грн/сот.',
+    slug: 'pokos',
   },
   {
     icon: Drill,
@@ -62,6 +81,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Буріння лунок мотобуром діаметром до 250 мм. Ідеально для встановлення паль, посадки дерев та будь-яких інших потреб.',
     price: 'від 100 грн/лунка',
+    slug: 'burinnya',
   },
   {
     icon: Droplets,
@@ -69,6 +89,7 @@ export const SERVICE_CARDS: ServiceCard[] = [
     description:
       'Мийка техніки та обладнання мобільною дизельною мийкою високого тиску 200 бар. Якісна чистка прямо у вас на ділянці.',
     price: 'від 250 грн',
+    slug: 'myjka',
   },
 ];
 
@@ -117,40 +138,54 @@ export const WORK_STEPS: WorkStep[] = [
 export interface BeforeAfterItem {
   title: string;
   subtitle: string;
-  beforeImage: string;
-  afterImage: string;
+  beforeImage: string | StaticImageData;
+  afterImage: string | StaticImageData;
 }
 
 export const BEFORE_AFTER_ITEMS: BeforeAfterItem[] = [
   {
     title: 'Обробка целини',
     subtitle: 'Запущена ділянка → готовий ґрунт',
-    beforeImage:
-      'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80',
-    afterImage:
-      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80',
+    beforeImage: celinaBefore,
+    afterImage: celinaAfter,
   },
   {
     title: 'Покос трави',
     subtitle: 'Висока трава → акуратний газон',
-    beforeImage:
-      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80',
-    afterImage:
-      'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
+    beforeImage: pokosBefore,
+    afterImage: pokosAfter,
   },
   {
     title: 'Підготовка ділянки',
     subtitle: 'Неприбрана земля → готові грядки',
     beforeImage:
-      'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80',
+      'https://images.unsplash.com/photo-1592841200221-a6898f307baa?w=600&q=80',
     afterImage:
-      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80',
+      'https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?w=600&q=80',
+  },
+];
+
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+export const FAQ_ITEMS: FaqItem[] = [
+  {
+    question: 'А що, якщо тракторист не приїде?',
+    answer:
+      'Кожна заявка в нашій системі автоматично закріплюється за конкретним спеціалістом. Якщо він не підтверджує виїзд вчасно — заявка миттєво й автоматично переходить до наступного вільного виконавця, без вашої участі й без втрати часу. Ви нічого не платите наперед: оплата — тільки після виконання роботи, тож фінансового ризику для вас немає в будь-якому разі.',
+  },
+  {
+    question: 'А що, якщо виконають роботу неякісно?',
+    answer:
+      'Перед виїздом ми безкоштовно узгоджуємо з вами обсяг і особливості ділянки, щоб уникнути непорозумінь. Результат ви оцінюєте на місці одразу після завершення робіт — оплата відбувається тільки після того, як вас все влаштувало. Якщо виникають спірні моменти — звертайтесь напряму, ми на зв’язку і вирішуємо такі питання оперативно.',
   },
 ];
 
 export const NAV_LINKS = [
-  { href: '#services', label: 'Послуги' },
-  { href: '#works', label: 'Роботи' },
-  { href: '#how', label: 'Як ми працюємо' },
-  { href: '#pricing', label: 'Ціни' },
+  { href: '/services', label: 'Послуги' },
+  { href: '/pricing', label: 'Ціни' },
+  { href: '/works', label: 'Роботи' },
+  { href: '/contacts', label: 'Контакти' },
 ];

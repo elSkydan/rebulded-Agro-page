@@ -1,4 +1,4 @@
-# Business Logic — Lead Distribution System (Production-Hardened)
+# Business Logic — Agro Aggregator System (Production-Hardened)
 
 ## 1. Worker Assignment — Replaced Round-Robin
 
