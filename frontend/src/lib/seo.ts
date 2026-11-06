@@ -94,7 +94,7 @@ export function localBusinessSchema() {
           },
           priceCurrency: 'UAH',
           price: '100',
-          description: 'від 100 грн/лунка',
+          description: 'від 100 грн/лунку',
         },
         {
           '@type': 'Offer',

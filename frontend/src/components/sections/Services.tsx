@@ -15,7 +15,7 @@ export function Services() {
             Що ми робимо в Харкові
           </h1>
           <p className="text-gray-500 text-base sm:text-lg">
-            Виконуємо роботи потужним дизельним мотоблоком 12 л.с. по Харкову та області
+            Виконуємо роботи потужним дизельним мотоблоком 12 к.с. по Харкову та області
           </p>
         </div>
 
@@ -64,7 +64,7 @@ export function Services() {
             </div>
             <div>
               <p className="text-white font-semibold text-sm sm:text-base">
-                Ціна залежить від об&apos;єму та складності робіт
+                Ціна залежить від обсягу та складності робіт
               </p>
               <p className="text-white/70 text-sm">
                 Зателефонуйте — розрахуємо безкоштовно за 2 хвилини
