@@ -10,7 +10,9 @@ export function Works() {
             Наші роботи
           </span>
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">До і після</h1>
-          <p className="text-gray-500">Натисніть на фото, щоб побачити результат нашої роботи</p>
+          <p className="text-gray-500">
+            Перемкніть До / Після або відкрийте фото на весь екран
+          </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {BEFORE_AFTER_ITEMS.map((item) => (
