@@ -102,7 +102,7 @@ export function fakeBackend(opts: Options = {}) {
 
     if (pathname === '/api/cities' && method === 'GET') return json(200, cities);
 
-    if (pathname === '/api/leads/debug/stats') return json(200, stats);
+    if (pathname === '/api/leads/stats' || pathname === '/api/leads/debug/stats') return json(200, stats);
     if (pathname === '/api/leads' && method === 'GET') {
       const status = searchParams.get('status');
       const limit = Number(searchParams.get('limit') ?? 50);

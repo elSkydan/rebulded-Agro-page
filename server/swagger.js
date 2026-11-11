@@ -329,14 +329,14 @@ const spec = {
       },
     },
 
-    '/api/leads/debug/stats': {
+    '/api/leads/stats': {
       get: {
         tags: ['Leads'],
-        summary: 'System stats snapshot (admin)',
+        summary: 'Admin summary tiles (also available as /api/leads/debug/stats)',
         security: [{ BearerAuth: [] }],
         responses: {
           200: {
-            description: 'Quick counters for the dashboard',
+            description: 'Counters aligned with Заявки badges',
             content: {
               'application/json': {
                 schema: {
@@ -344,9 +344,9 @@ const spec = {
                   properties: {
                     total_leads:    { type: 'integer', example: 120 },
                     active_workers: { type: 'integer', example: 8 },
-                    pending_leads:  { type: 'integer', example: 3 },
-                    unassigned_leads: { type: 'integer', example: 1, description: 'status = unassigned (no worker took it)' },
-                    today_leads:    { type: 'integer', example: 4, description: 'Created since 00:00 Europe/Kiev' },
+                    pending_leads:  { type: 'integer', example: 3, description: 'status IN (new, assigned)' },
+                    unassigned_leads: { type: 'integer', example: 1, description: 'status = unassigned (= badge «Без виконавця»)' },
+                    today_leads:    { type: 'integer', example: 4, description: 'Created on the current Europe/Kiev calendar day' },
                   },
                 },
               },

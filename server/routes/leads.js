@@ -5,7 +5,7 @@
  *
  * POST   /api/leads             — public, rate-limited
  * GET    /api/leads             — admin, paginated
- * GET    /api/leads/debug/stats — admin (registered before /:id)
+ * GET    /api/leads/stats       — admin summary (also /debug/stats alias)
  * GET    /api/leads/:id         — admin
  * POST   /api/leads/:id/assign  — admin, manual worker assign
  * PATCH  /api/leads/:id/cancel  — admin, restricted statuses
@@ -265,26 +265,33 @@ router.get('/', auth, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/leads/debug/stats  (admin) — must be before /:id
+// GET /api/leads/stats  (admin) — must be before /:id
+// Alias: /debug/stats (older clients)
+//
+// Tile semantics (must match the Заявки UI badges/filters):
+//   Сьогодні        — created on the current calendar day in Europe/Kiev
+//   Очікують        — status IN (new, assigned) — waiting to be sent / accepted
+//   Без виконавця   — status = unassigned — same as badge «Без виконавця»
+//   Активні виконавці — workers.is_active
 // ---------------------------------------------------------------------------
 
-router.get('/debug/stats', auth, async (req, res) => {
+async function sendLeadStats(req, res) {
   try {
     const { rows } = await pool.query(
       `SELECT
-         (SELECT COUNT(*) FROM leads)                                    AS total_leads,
-         (SELECT COUNT(*) FROM workers WHERE is_active = TRUE)          AS active_workers,
-         -- Waiting on a worker reply (sent / not yet accepted)
-         (SELECT COUNT(*) FROM leads WHERE status IN ('new','assigned')) AS pending_leads,
-         -- No current worker — must match badge «Без виконавця» (status unassigned)
-         (SELECT COUNT(*) FROM leads WHERE status = 'unassigned')       AS unassigned_leads,
-         (SELECT COUNT(*) FROM leads
-           WHERE created_at >= (date_trunc('day', NOW() AT TIME ZONE 'Europe/Kiev')
-                                AT TIME ZONE 'Europe/Kiev'))          AS today_leads`
+         COUNT(*)::int AS total_leads,
+         COUNT(*) FILTER (WHERE status IN ('new', 'assigned'))::int AS pending_leads,
+         COUNT(*) FILTER (WHERE status = 'unassigned')::int AS unassigned_leads,
+         COUNT(*) FILTER (
+           WHERE (created_at AT TIME ZONE 'Europe/Kiev')::date
+               = (NOW() AT TIME ZONE 'Europe/Kiev')::date
+         )::int AS today_leads,
+         (SELECT COUNT(*)::int FROM workers WHERE is_active = TRUE) AS active_workers
+       FROM leads`
     );
-    const r = rows[0];
+    const r = rows[0] ?? {};
     const n = (v) => {
-      const x = parseInt(v, 10);
+      const x = typeof v === 'number' ? v : parseInt(v, 10);
       return Number.isFinite(x) ? x : 0;
     };
     res.json({
@@ -295,10 +302,13 @@ router.get('/debug/stats', auth, async (req, res) => {
       today_leads:      n(r.today_leads),
     });
   } catch (err) {
-    console.error('[GET /debug/stats]', err);
+    console.error('[GET /leads/stats]', err);
     res.status(500).json({ error: 'Database error' });
   }
-});
+}
+
+router.get('/stats', auth, sendLeadStats);
+router.get('/debug/stats', auth, sendLeadStats);
 
 // ---------------------------------------------------------------------------
 // GET /api/leads/:id  (admin)

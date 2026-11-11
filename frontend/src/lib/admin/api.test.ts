@@ -86,7 +86,7 @@ describe('createAdminApi', () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/leads/5/cancel');
     expect(fetchMock.mock.calls[0][1].method).toBe('PATCH');
-    expect(fetchMock.mock.calls[1][0]).toBe('/api/leads/debug/stats');
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/leads/stats');
     // Missing keys become 0 so the summary never shows "—" for a loaded payload.
     expect(stats).toEqual({
       total_leads: 1,
@@ -94,6 +94,30 @@ describe('createAdminApi', () => {
       pending_leads: 0,
       unassigned_leads: 0,
       today_leads: 0,
+    });
+  });
+
+  it('parses string counts from stats and falls back to /debug/stats', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(404, { error: 'not found' }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          total_leads: '3',
+          active_workers: '1',
+          pending_leads: '0',
+          unassigned_leads: '3',
+          today_leads: '3',
+        }),
+      );
+    const stats = await createAdminApi('t', fetchMock).getStats();
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(['/api/leads/stats', '/api/leads/debug/stats']);
+    expect(stats).toEqual({
+      total_leads: 3,
+      active_workers: 1,
+      pending_leads: 0,
+      unassigned_leads: 3,
+      today_leads: 3,
     });
   });
 

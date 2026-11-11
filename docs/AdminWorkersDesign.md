@@ -169,7 +169,7 @@ The admin opens on **Заявки** (most used); **Виконавці** is the s
 | Endpoint | Change | Why |
 |---|---|---|
 | `GET /api/leads` | add `city_name`, `out_of_city`, `comment`, `phone_raw` to the list; `status` must be a valid `lead_status_enum` value → else `400 INVALID_STATUS` | list is useless without city/comment; a bad status used to reach PG and return 500 |
-| `GET /api/leads/debug/stats` | add `unassigned_leads` (status `unassigned`) and `today_leads` (since 00:00 Europe/Kyiv); existing fields unchanged | "stuck" leads are the KPI that matters |
+| `GET /api/leads/stats` (alias `/debug/stats`) | `unassigned_leads` = `COUNT(status=unassigned)` (same as badge «Без виконавця»); `today_leads` = Kyiv calendar day; `pending_leads` = new+assigned | tiles must match the list badges |
 | `PATCH /api/leads/:id/cancel` | single conditional `UPDATE … WHERE status = ANY(cancelable) RETURNING` instead of read-then-write | race: a worker could accept between the read and the write and the cancel would overwrite `accepted` |
 
 Telegram side needs no change: a worker pressing a button on a canceled lead already gets

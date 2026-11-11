@@ -110,8 +110,24 @@ export function createAdminApi(
     assignLead: (id, workerId) =>
       request<AssignLeadResult>('POST', `/api/leads/${id}/assign`, { worker_id: workerId }),
     getStats: async () => {
-      const raw = await request<Partial<LeadStats>>('GET', '/api/leads/debug/stats');
-      const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+      // Prefer /stats; fall back to legacy /debug/stats if an older API is still up.
+      let raw: Partial<LeadStats>;
+      try {
+        raw = await request<Partial<LeadStats>>('GET', '/api/leads/stats');
+      } catch (err) {
+        if (!(err instanceof AdminApiError) || err.status === 401 || err.code === 'NETWORK_ERROR') {
+          throw err;
+        }
+        raw = await request<Partial<LeadStats>>('GET', '/api/leads/debug/stats');
+      }
+      const n = (v: unknown) => {
+        if (typeof v === 'number' && Number.isFinite(v)) return v;
+        if (typeof v === 'string' && v.trim() !== '') {
+          const x = Number(v);
+          if (Number.isFinite(x)) return x;
+        }
+        return 0;
+      };
       return {
         total_leads: n(raw.total_leads),
         active_workers: n(raw.active_workers),
