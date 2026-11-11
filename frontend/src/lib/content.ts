@@ -187,5 +187,76 @@ export const NAV_LINKS = [
   { href: '/services', label: 'Послуги' },
   { href: '/pricing', label: 'Ціни' },
   { href: '/works', label: 'Роботи' },
+  { href: '/reviews', label: 'Відгуки' },
   { href: '/contacts', label: 'Контакти' },
 ];
+
+/** Secondary / legal links shown in the footer (not primary nav). */
+export const FOOTER_LINKS = [
+  { href: '/contractors', label: 'Стати виконавцем' },
+  { href: '/privacy', label: 'Політика конфіденційності' },
+  { href: '/reviews', label: 'Відгуки' },
+];
+
+export interface ReviewItem {
+  author: string;
+  city: string;
+  service: string;
+  rating: 1 | 2 | 3 | 4 | 5;
+  dateLabel: string;
+  text: string;
+}
+
+/**
+ * Placeholder customer reviews for the /reviews page.
+ * Replace with real quotes (or a CMS/API feed) once Google/manual collection is live.
+ * Bot-driven review requests after lead completion are intentionally deferred.
+ */
+export const REVIEW_ITEMS: ReviewItem[] = [
+  {
+    author: 'Олена К.',
+    city: 'Харків',
+    service: 'Вспашка городу',
+    rating: 5,
+    dateLabel: 'жовтень 2026',
+    text: 'Залишила заявку ввечері — наступного ранку вже працювали на ділянці. Порахували по калькулятору, без сюрпризів. Дякую!',
+  },
+  {
+    author: 'Андрій М.',
+    city: 'Харківська область',
+    service: 'Покос трави',
+    rating: 5,
+    dateLabel: 'вересень 2026',
+    text: 'Велика ділянка за містом. Приїхали вчасно, зробили акуратно. Оплата після роботи — так і домовились.',
+  },
+  {
+    author: 'Ірина С.',
+    city: 'Харків',
+    service: 'Обробка целини',
+    rating: 4,
+    dateLabel: 'серпень 2026',
+    text: 'Целина була запущена кілька років. Виконавець пояснив, що саме зроблять, і вклались у погоджений обсяг.',
+  },
+];
+
+export const CONTRACTOR_REQUIREMENTS = [
+  'Власна або орендована техніка (мотоблок / трактор) у справному стані',
+  'Готовність виїжджати в Харкові та області в робочі години',
+  'Telegram для отримання заявок і швидкої відповіді',
+  'Готовність підтвердити особу та досвід під час короткої перевірки',
+] as const;
+
+export const CONTRACTOR_STEPS = [
+  {
+    title: 'Заявка в Telegram',
+    body: 'Напишіть боту, коротко опишіть техніку, район виїзду і досвід.',
+  },
+  {
+    title: 'Перевірка',
+    body: 'Менеджер уточнює деталі, перевіряє контакти й готовність брати заявки.',
+  },
+  {
+    title: 'Отримання лідів',
+    body: 'Після активації заявки з вашого міста приходять у Telegram — приймаєте або відхиляєте.',
+  },
+] as const;

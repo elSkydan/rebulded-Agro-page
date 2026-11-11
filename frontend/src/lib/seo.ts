@@ -152,4 +152,4 @@ export function serviceSchema(input: {
 }
 
 /** Bump only when public SEO content actually changes (sitemap lastModified). */
-export const SITE_CONTENT_UPDATED = new Date('2026-11-11T00:00:00.000Z');
+export const SITE_CONTENT_UPDATED = new Date('2026-11-11T18:00:00.000Z');
