@@ -2,6 +2,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Hero } from '@/components/sections/Hero';
 import { HowWeWork } from '@/components/sections/HowWeWork';
+import { WorksPreview } from '@/components/sections/WorksPreview';
 import { ExploreMore } from '@/components/sections/ExploreMore';
 
 export default function HomePage() {
@@ -11,6 +12,7 @@ export default function HomePage() {
       <main className="flex-1">
         <Hero />
         <HowWeWork />
+        <WorksPreview />
         <ExploreMore />
       </main>
       <Footer />

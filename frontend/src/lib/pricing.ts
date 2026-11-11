@@ -7,7 +7,10 @@
 export type ServiceType = 'ogorod' | 'celina' | 'mowing' | 'tree' | 'washing';
 
 export const OUT_OF_CITY_SURCHARGE_UAH = 800;
+/** Out-of-city surcharge applies within this radius (km). */
+export const OUT_OF_CITY_RADIUS_KM = 150;
 export const MAX_AREA_DISPLAY = 50;
+export const MIN_ORDER_UAH = 1500;
 
 const OGOROD_RATE_PER_SOTKA = 300;
 const CELINA_RATE_PER_SOTKA = 600;
@@ -18,7 +21,7 @@ const MOWING_MIN = 200;
 const TREE_MIN = 500;
 const WASHING_MIN = 250;
 
-const MIN_ORDER = 1000;
+const MIN_ORDER = MIN_ORDER_UAH;
 
 /** Services where the area input is dimmed (price does not depend on it). */
 export const AREA_OPTIONAL_SERVICES: ReadonlySet<ServiceType> = new Set([
@@ -172,7 +175,7 @@ export function formatFormula(
   }
 
   if (outOfCity) {
-    line += ` + ${OUT_OF_CITY_SURCHARGE_UAH} грн (виїзд за місто)`;
+    line += ` + ${OUT_OF_CITY_SURCHARGE_UAH} грн (виїзд за місто, до ${OUT_OF_CITY_RADIUS_KM} км)`;
   }
   return line;
 }
