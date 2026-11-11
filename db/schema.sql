@@ -2,17 +2,19 @@
 --  schema.sql  —  Lead Distribution System
 --  PostgreSQL 14+
 --
+--  Single source of truth for new installs AND existing DBs.
+--  Applied by: npm run db:migrate  (scripts/migrate.js)
+--
 --  IDEMPOTENT: safe to re-run on an existing database.
 --    • CREATE TYPE  wrapped in DO blocks (no IF NOT EXISTS in PG)
---    • CREATE TABLE uses IF NOT EXISTS
---    • CREATE INDEX uses IF NOT EXISTS
+--    • ENUM catch-up via ALTER TYPE ... ADD VALUE IF NOT EXISTS
+--    • CREATE TABLE / INDEX uses IF NOT EXISTS
+--    • Missing columns via ADD COLUMN IF NOT EXISTS
 --    • Trigger uses CREATE OR REPLACE (PG14+)
 --
---  Run order:
---    1. schema.sql         (base tables + columns)
---    2. lead_assignments.sql  (extra columns + unique index — idempotent)
---    3. migrate_service_types.sql  (only needed for existing pre-v2 DBs)
---    4. add_comment_column.sql     (adds leads.comment)
+--  Legacy upgrade scripts under db/ (lead_assignments.sql,
+--  migrate_service_types.sql, add_comment_column.sql) are no
+--  longer part of the deploy path — their changes live here.
 -- ============================================================
 
 -- ── ENUMS ────────────────────────────────────────────────────
@@ -32,6 +34,11 @@ DO $$ BEGIN
   CREATE TYPE service_type_enum AS ENUM ('ogorod', 'celina', 'mowing', 'tree', 'washing');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
+-- Catch up pre-v2 DBs whose service_type_enum was created with fewer values.
+ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'mowing';
+ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'tree';
+ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'washing';
 
 DO $$ BEGIN
   CREATE TYPE lead_status_enum AS ENUM (
@@ -90,12 +97,14 @@ CREATE TABLE IF NOT EXISTS workers (
   created_at            TIMESTAMPTZ         NOT NULL DEFAULT NOW()
 );
 
--- Used by assignmentService: pick next eligible worker
-CREATE INDEX IF NOT EXISTS idx_workers_city_active ON workers (city_id, is_active)
+-- pickWorker: city + active filter, then priority / round-robin order
+DROP INDEX IF EXISTS idx_workers_city_active;
+CREATE INDEX IF NOT EXISTS idx_workers_city_priority
+  ON workers (city_id, priority DESC, last_assigned_at ASC NULLS FIRST)
   WHERE is_active = TRUE;
 
--- Used by timeoutService + telegramService
-CREATE INDEX IF NOT EXISTS idx_workers_telegram ON workers (telegram_chat_id);
+-- telegram_chat_id already has a UNIQUE btree index — no separate idx needed.
+DROP INDEX IF EXISTS idx_workers_telegram;
 
 -- ── LEADS ────────────────────────────────────────────────────
 
@@ -125,13 +134,18 @@ CREATE TABLE IF NOT EXISTS leads (
 -- Anti-spam: find duplicate by phone in last N minutes
 CREATE INDEX IF NOT EXISTS idx_leads_phone_created ON leads (phone_normalized, created_at DESC);
 
--- Timeout cron: find assigned leads past their deadline
+-- Timeout cron: find assigned/accepted leads past their deadline
 CREATE INDEX IF NOT EXISTS idx_leads_status_updated ON leads (status, updated_at)
   WHERE status IN ('assigned', 'accepted');
 
--- Admin dashboard: filter by city or worker
-CREATE INDEX IF NOT EXISTS idx_leads_city   ON leads (city_id);
-CREATE INDEX IF NOT EXISTS idx_leads_worker ON leads (worker_id);
+-- pickWorker active-lead count: worker_id + status IN ('assigned','accepted')
+DROP INDEX IF EXISTS idx_leads_worker;
+CREATE INDEX IF NOT EXISTS idx_leads_worker_active
+  ON leads (worker_id)
+  WHERE status IN ('assigned', 'accepted');
+
+-- No current query filters leads by city_id alone (FK covers integrity).
+DROP INDEX IF EXISTS idx_leads_city;
 
 -- ── LEAD_ASSIGNMENTS ─────────────────────────────────────────
 
@@ -149,19 +163,23 @@ CREATE TABLE IF NOT EXISTS lead_assignments (
   created_at            TIMESTAMPTZ             NOT NULL DEFAULT NOW()
 );
 
--- Used to skip already-tried workers during reassignment
-CREATE INDEX IF NOT EXISTS idx_la_lead ON lead_assignments (lead_id);
-
--- Prevent sending the same lead to the same worker twice
-CREATE UNIQUE INDEX IF NOT EXISTS uq_la_lead_worker ON lead_assignments (lead_id, worker_id);
+-- Prevent sending the same lead to the same worker twice.
+-- Also covers lookups by lead_id (replaces former idx_la_lead).
+CREATE UNIQUE INDEX IF NOT EXISTS uq_lead_assignments_lead_worker
+  ON lead_assignments (lead_id, worker_id);
 
 -- DB-level guarantee: at most ONE accepted assignment per lead.
 -- Concurrent transactions that both try to mark 'accepted' will serialize;
 -- the second one gets a unique violation (PG code 23505) and rolls back.
 -- acceptLead() in assignmentService catches 23505 and returns { result: 'already_taken' }.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_la_lead_accepted
+CREATE UNIQUE INDEX IF NOT EXISTS uq_lead_assignments_lead_accepted
   ON lead_assignments (lead_id)
   WHERE (status = 'accepted');
+
+-- Drop superseded short names / redundant lead_id-only index.
+DROP INDEX IF EXISTS idx_la_lead;
+DROP INDEX IF EXISTS uq_la_lead_worker;
+DROP INDEX IF EXISTS uq_la_lead_accepted;
 
 -- ── TRIGGER: auto-update leads.updated_at ────────────────────
 
@@ -177,6 +195,19 @@ $$;
 CREATE OR REPLACE TRIGGER trg_leads_updated_at
   BEFORE UPDATE ON leads
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ── EXISTING-DB COLUMN CATCH-UP ──────────────────────────────
+-- CREATE TABLE IF NOT EXISTS does not add columns to old tables.
+-- These statements are no-ops when the column already exists.
+
+ALTER TABLE lead_assignments
+  ADD COLUMN IF NOT EXISTS message_id BIGINT;
+
+ALTER TABLE lead_assignments
+  ADD COLUMN IF NOT EXISTS responded_at TIMESTAMPTZ;
+
+ALTER TABLE leads
+  ADD COLUMN IF NOT EXISTS comment TEXT;
 
 -- Raise global min-order floor (existing DBs keep the old inline CHECK name)
 ALTER TABLE leads DROP CONSTRAINT IF EXISTS leads_total_price_check;

@@ -13,7 +13,7 @@ function respondLeadDbError(res, err, logPrefix) {
   ) {
     return res.status(503).json({
       error:
-        'Database is missing service types used by the form. Run db/migrate_service_types.sql on the server database.',
+        'Database is missing service types used by the form. Run npm run db:migrate (applies db/schema.sql).',
       code: 'SCHEMA_ENUM_MISMATCH',
     });
   }
