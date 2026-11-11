@@ -20,9 +20,9 @@ function parseServiceParam(raw: string | null): ServiceType | null {
 }
 
 /**
- * Owns the state shared between the calculator and the lead form:
- * the calculator drives service/area/out-of-city, and the form
- * mirrors the selected service (user can still override it).
+ * Owns the state shared between the calculator and the lead form.
+ * Service/area/out-of-city stay in one place so both panels always match
+ * what gets submitted with the lead.
  */
 export function PricingSection() {
   const searchParams = useSearchParams();
@@ -31,22 +31,18 @@ export function PricingSection() {
   const [service, setService] = useState<ServiceType>(initial);
   const [areaInput, setAreaInput] = useState<string>(String(minAreaForService(initial)));
   const [outOfCity, setOutOfCity] = useState(false);
-  const [formService, setFormService] = useState<ServiceType>(initial);
 
   useEffect(() => {
     const fromQuery = parseServiceParam(searchParams.get('service'));
     if (!fromQuery) return;
     setService(fromQuery);
-    setFormService(fromQuery);
     setAreaInput(String(minAreaForService(fromQuery)));
   }, [searchParams]);
 
   const handleServiceChange = useCallback((next: ServiceType) => {
     setService(next);
-    // Legacy behaviour: switching the service resets area to its minimum
-    // and syncs the form's service select.
+    // Switching the service resets area to its minimum for that service.
     setAreaInput(String(minAreaForService(next)));
-    setFormService(next);
   }, []);
 
   return (
@@ -78,8 +74,8 @@ export function PricingSection() {
           </div>
           <div className="min-w-0">
             <LeadForm
-              service={formService}
-              onServiceChange={setFormService}
+              service={service}
+              onServiceChange={handleServiceChange}
               areaInput={areaInput}
               outOfCity={outOfCity}
             />

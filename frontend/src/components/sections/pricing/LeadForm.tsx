@@ -6,7 +6,10 @@ import { ApiError, createLead, fetchPublicCities, type PublicCity } from '@/lib/
 import { siteConfig } from '@/lib/config';
 import { SERVICE_OPTIONS, isActiveRegion } from '@/lib/content';
 import {
+  AREA_OPTIONAL_SERVICES,
   MAX_AREA_DISPLAY,
+  calcClientPreview,
+  formatArea,
   minAreaForService,
   roundArea,
   type ServiceType,
@@ -17,6 +20,9 @@ const PERKS = [
   'Виїзд зазвичай того ж дня',
   'Оплата після виконання роботи',
 ];
+
+const REGION_NOTICE =
+  'Зараз працюємо в Харкові та області. Ви з іншого міста? Залиште заявку — повідомимо, щойно запрацюємо у вашому регіоні.';
 
 /** Formats raw digits into "+38 (0XX) XXX-XX-XX" as the user types. */
 function formatPhone(raw: string): string {
@@ -38,18 +44,16 @@ function isValidPhone(val: string): boolean {
   return val.replace(/\D/g, '').length >= 10;
 }
 
-function cityOptionLabel(city: PublicCity): string {
-  return isActiveRegion(city.name)
-    ? `${city.name} — наразі працюємо в цьому регіоні`
-    : city.name;
-}
-
 function pickDefaultCityId(cities: PublicCity[]): number {
   const active = cities.find((c) => isActiveRegion(c.name));
   if (active) return active.id;
   const configured = cities.find((c) => c.id === siteConfig.defaultCityId);
   if (configured) return configured.id;
   return cities[0]?.id ?? siteConfig.defaultCityId;
+}
+
+function serviceLabel(service: ServiceType): string {
+  return SERVICE_OPTIONS.find((opt) => opt.value === service)?.label ?? service;
 }
 
 interface LeadFormProps {
@@ -68,7 +72,6 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
   const [comment, setComment] = useState('');
   const [cities, setCities] = useState<PublicCity[]>([]);
   const [cityId, setCityId] = useState<number>(siteConfig.defaultCityId);
-  const [citiesError, setCitiesError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [status, setStatus] = useState<FormStatus>('idle');
@@ -81,12 +84,10 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
         if (cancelled) return;
         setCities(list);
         setCityId(pickDefaultCityId(list));
-        setCitiesError(null);
       })
       .catch(() => {
         if (cancelled) return;
         setCities([]);
-        setCitiesError('Не вдалося завантажити міста. Заявку можна надіслати для регіону за замовчуванням.');
         setCityId(siteConfig.defaultCityId);
       });
 
@@ -102,6 +103,27 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
     if (!Number.isFinite(rounded)) return minA;
     return Math.min(Math.max(rounded, minA), MAX_AREA_DISPLAY);
   }
+
+  const preview = calcClientPreview(service, areaInput, outOfCity);
+  const showAreaInSummary = !AREA_OPTIONAL_SERVICES.has(service);
+  const estimateSummary = preview.ok
+    ? [
+        serviceLabel(service),
+        showAreaInSummary ? `${formatArea(preview.area)} сот.` : null,
+        outOfCity ? 'за містом' : null,
+        `${preview.total} грн`,
+      ]
+        .filter(Boolean)
+        .join(', ')
+        .replace(/, ([^,]+)$/, ' — $1')
+    : null;
+
+  const selectedCity =
+    cities.find((c) => c.id === cityId) ??
+    cities.find((c) => isActiveRegion(c.name)) ??
+    null;
+  const singleCityMode = cities.length <= 1;
+  const cityDisplayName = selectedCity?.name ?? 'Харків';
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -155,6 +177,13 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
           </div>
         ) : (
           <form onSubmit={handleSubmit} noValidate>
+            {estimateSummary && (
+              <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
+                <p className="text-xs font-medium text-primary mb-0.5">До заявки додано</p>
+                <p className="text-sm text-gray-800">{estimateSummary}</p>
+              </div>
+            )}
+
             <div className="mb-3">
               <label htmlFor="form-name" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Ваше ім&apos;я
@@ -196,31 +225,33 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
               <label htmlFor="form-city" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Місто / регіон <span className="text-red-500">*</span>
               </label>
-              <div className="relative select-wrap">
-                <select
+              {singleCityMode ? (
+                <div
                   id="form-city"
-                  value={cityId}
-                  onChange={(e) => setCityId(Number(e.target.value))}
-                  disabled={cities.length === 0}
-                  className="w-full max-w-full min-w-0 appearance-none bg-white border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer disabled:bg-gray-50 disabled:cursor-wait"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 sm:px-4 py-2.5 text-sm text-gray-800"
                 >
-                  {cities.length === 0 ? (
-                    <option value={siteConfig.defaultCityId}>Харків — наразі працюємо в цьому регіоні</option>
-                  ) : (
-                    cities.map((city) => (
-                      <option key={city.id} value={city.id}>
-                        {cityOptionLabel(city)}
-                      </option>
-                    ))
-                  )}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3">
-                  <ChevronDown className="w-4 h-4 text-gray-400" aria-hidden="true" />
+                  {cityDisplayName}
                 </div>
-              </div>
-              {citiesError && (
-                <p className="text-amber-700 text-xs mt-1">{citiesError}</p>
+              ) : (
+                <div className="relative select-wrap">
+                  <select
+                    id="form-city"
+                    value={cityId}
+                    onChange={(e) => setCityId(Number(e.target.value))}
+                    className="w-full max-w-full min-w-0 appearance-none bg-white border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer"
+                  >
+                    {cities.map((city) => (
+                      <option key={city.id} value={city.id}>
+                        {city.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3">
+                    <ChevronDown className="w-4 h-4 text-gray-400" aria-hidden="true" />
+                  </div>
+                </div>
               )}
+              <p className="text-gray-500 text-xs mt-1.5 leading-relaxed">{REGION_NOTICE}</p>
             </div>
 
             <div className="mb-3">
@@ -253,7 +284,7 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
               <textarea
                 id="form-comment"
                 rows={2}
-                placeholder="Площа, адреса, зручний час..."
+                placeholder="Адреса, зручний час…"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 maxLength={1000}
