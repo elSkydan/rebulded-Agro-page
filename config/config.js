@@ -8,7 +8,8 @@ module.exports = {
   // Defaults to ADMIN_CHAT_ID when not set independently.
   ADMIN_LOG_CHANNEL:     Number(process.env.ADMIN_LOG_CHANNEL)       ||
                          Number(process.env.ADMIN_CHAT_ID)           || 0,
-  ADMIN_TOKEN:           process.env.ADMIN_TOKEN                    || 'change-me',
+  // No default: an empty token makes the auth middleware reject every request (fail closed).
+  ADMIN_TOKEN:           process.env.ADMIN_TOKEN                    || '',
   ACTIVE_LEAD_LIMIT:     Number(process.env.ACTIVE_LEAD_LIMIT)      || 3,
   TIMEOUT_MINUTES:       Number(process.env.TIMEOUT_MINUTES)        || 3,
   ACCEPTED_TTL_MINUTES:  Number(process.env.ACCEPTED_TTL_MINUTES)   || 30,

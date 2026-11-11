@@ -27,6 +27,12 @@ const TERMINAL_STATUSES = ['completed', 'canceled', 'failed_contact'];
 // Statuses from which cancel is allowed
 const CANCELABLE_STATUSES = ['new', 'assigned', 'timeout'];
 
+// Mirrors lead_status_enum — validated before reaching PG (bad enum text would be a 500).
+const LEAD_STATUSES = [
+  'new', 'assigned', 'accepted', 'rejected', 'timeout',
+  'completed', 'canceled', 'unassigned', 'failed_contact',
+];
+
 // ---------------------------------------------------------------------------
 // POST /api/leads
 // ---------------------------------------------------------------------------
@@ -190,6 +196,13 @@ router.get('/', auth, async (req, res) => {
   const offset = Math.max(parseInt(req.query.offset, 10) || 0,  0);
   const status = req.query.status ?? null;
 
+  if (status !== null && !LEAD_STATUSES.includes(status)) {
+    return res.status(400).json({
+      error: `Unknown status "${status}". Allowed: ${LEAD_STATUSES.join(', ')}.`,
+      code:  'INVALID_STATUS',
+    });
+  }
+
   const SORT_MAP = {
     'created_at_desc': 'l.created_at DESC',
     'created_at_asc':  'l.created_at ASC',
@@ -216,12 +229,14 @@ router.get('/', auth, async (req, res) => {
 
     values.push(limit, offset);
     const { rows } = await pool.query(
-      `SELECT l.id, l.name, l.phone_normalized, l.service_type,
-              l.area, l.total_price, l.city_id, l.status,
-              l.created_at, l.updated_at,
+      `SELECT l.id, l.name, l.phone_normalized, l.phone_raw, l.service_type,
+              l.area, l.total_price, l.city_id, l.out_of_city, l.status,
+              l.comment, l.created_at, l.updated_at,
+              c.name AS city_name,
               w.id   AS worker_id,
               w.name AS worker_name
        FROM   leads l
+       LEFT JOIN cities  c ON c.id = l.city_id
        LEFT JOIN workers w ON w.id = l.worker_id
        ${where}
        ORDER BY ${orderBy}
@@ -251,13 +266,19 @@ router.get('/debug/stats', auth, async (req, res) => {
       `SELECT
          (SELECT COUNT(*) FROM leads)                                    AS total_leads,
          (SELECT COUNT(*) FROM workers WHERE is_active = TRUE)          AS active_workers,
-         (SELECT COUNT(*) FROM leads WHERE status IN ('new','assigned')) AS pending_leads`
+         (SELECT COUNT(*) FROM leads WHERE status IN ('new','assigned')) AS pending_leads,
+         (SELECT COUNT(*) FROM leads WHERE status = 'unassigned')       AS unassigned_leads,
+         (SELECT COUNT(*) FROM leads
+           WHERE created_at >= (date_trunc('day', NOW() AT TIME ZONE 'Europe/Kiev')
+                                AT TIME ZONE 'Europe/Kiev'))          AS today_leads`
     );
     const r = rows[0];
     res.json({
       total_leads:    parseInt(r.total_leads, 10),
       active_workers: parseInt(r.active_workers, 10),
       pending_leads:  parseInt(r.pending_leads, 10),
+      unassigned_leads: parseInt(r.unassigned_leads, 10),
+      today_leads:    parseInt(r.today_leads, 10),
     });
   } catch (err) {
     console.error('[GET /debug/stats]', err);
@@ -324,32 +345,27 @@ router.patch('/:id/cancel', auth, async (req, res) => {
   }
 
   try {
-    // First read current status
-    const { rows: readRows } = await pool.query(
-      `SELECT id, status FROM leads WHERE id = $1`,
-      [id]
-    );
-
-    if (!readRows.length) {
-      return res.status(404).json({ error: 'Lead not found' });
-    }
-
-    const current = readRows[0].status;
-
-    if (!CANCELABLE_STATUSES.includes(current)) {
-      return res.status(400).json({
-        error: `Cannot cancel a lead with status "${current}". Allowed: ${CANCELABLE_STATUSES.join(', ')}.`,
-        code:  'INVALID_TRANSITION',
-      });
-    }
-
-    await pool.query(
+    // One conditional UPDATE: a worker accepting in parallel can't be overwritten.
+    const { rows } = await pool.query(
       `UPDATE leads
        SET    status     = 'canceled',
               updated_at = NOW()
-       WHERE  id = $1`,
-      [id]
+       WHERE  id = $1
+         AND  status = ANY($2::lead_status_enum[])
+       RETURNING id`,
+      [id, CANCELABLE_STATUSES]
     );
+
+    if (!rows.length) {
+      const { rows: current } = await pool.query(`SELECT status FROM leads WHERE id = $1`, [id]);
+      if (!current.length) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+      return res.status(400).json({
+        error: `Cannot cancel a lead with status "${current[0].status}". Allowed: ${CANCELABLE_STATUSES.join(', ')}.`,
+        code:  'INVALID_TRANSITION',
+      });
+    }
 
     return res.json({ lead_id: id, status: 'canceled' });
 

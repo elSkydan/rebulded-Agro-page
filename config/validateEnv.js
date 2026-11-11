@@ -101,6 +101,17 @@ function validateEnv() {
     );
   }
 
+  // ── ADMIN_TOKEN — warning only: a bad token locks the admin API (fail closed),
+  //    it must not take the public lead flow down with it.
+  const adminToken = process.env.ADMIN_TOKEN;
+  if (!adminToken) {
+    warnings.push('ADMIN_TOKEN is not set — admin API (/api/workers, /api/cities, /api/leads) will reject all requests');
+  } else if (isPlaceholder(adminToken)) {
+    warnings.push('ADMIN_TOKEN appears to be a placeholder — replace it with 32+ random characters');
+  } else if (adminToken.length < 32) {
+    warnings.push(`ADMIN_TOKEN is only ${adminToken.length} characters — use 32+ random characters`);
+  }
+
   // ── DATABASE_URL ───────────────────────────────────────────────────────────
   if (!process.env.DATABASE_URL && !process.env.PGHOST) {
     errors.push('Neither DATABASE_URL nor PGHOST is set — cannot connect to PostgreSQL');
