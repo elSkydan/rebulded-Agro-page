@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Check, CheckCircle, ChevronDown, Send } from 'lucide-react';
 import { ApiError, createLead, fetchPublicCities, type PublicCity } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import { siteConfig } from '@/lib/config';
 import { SERVICE_OPTIONS, isActiveRegion } from '@/lib/content';
 import {
@@ -136,15 +137,21 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
     setStatus('submitting');
     setSubmitError(null);
 
+    const area = effectiveArea();
     try {
       await createLead({
         name: name.trim(),
         phone: phone.trim(),
         service_type: service,
-        area: effectiveArea(),
+        area,
         city_id: cityId,
         out_of_city: outOfCity,
         comment: comment.trim() || undefined,
+      });
+      trackEvent('generate_lead', {
+        service,
+        area,
+        value: preview.ok ? preview.total : 0,
       });
       setStatus('success');
     } catch (err) {

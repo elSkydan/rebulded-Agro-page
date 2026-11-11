@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
+import { AnalyticsListeners } from '@/components/analytics/AnalyticsListeners';
 import { siteConfig } from '@/lib/config';
 import { jsonLdScript, localBusinessSchema, websiteSchema } from '@/lib/seo';
 import './globals.css';
@@ -87,6 +88,7 @@ export default function RootLayout({
       <body className="min-h-dvh flex flex-col font-sans bg-white text-gray-900 antialiased">
         <JsonLd />
         {children}
+        <AnalyticsListeners />
         {GA_MEASUREMENT_ID && <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />}
       </body>
     </html>
