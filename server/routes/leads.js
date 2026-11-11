@@ -7,6 +7,7 @@
  * GET    /api/leads             — admin, paginated
  * GET    /api/leads/debug/stats — admin (registered before /:id)
  * GET    /api/leads/:id         — admin
+ * POST   /api/leads/:id/assign  — admin, manual worker assign
  * PATCH  /api/leads/:id/cancel  — admin, restricted statuses
  */
 
@@ -14,7 +15,7 @@ const express  = require('express');
 const router   = express.Router();
 const pool     = require('../../db/pool');
 const { calcPrice }                    = require('../services/pricingService');
-const { assignLead }                   = require('../services/assignmentService');
+const assignmentService = require('../services/assignmentService');
 const rateLimiter                      = require('../middlewares/rateLimiter');
 const { validateLead, normalizePhone } = require('../middlewares/validateLead');
 const auth                             = require('../middlewares/auth');
@@ -26,6 +27,12 @@ const TERMINAL_STATUSES = ['completed', 'canceled', 'failed_contact'];
 
 // Statuses from which cancel is allowed
 const CANCELABLE_STATUSES = ['new', 'assigned', 'timeout'];
+
+// Mirrors lead_status_enum — validated before reaching PG (bad enum text would be a 500).
+const LEAD_STATUSES = [
+  'new', 'assigned', 'accepted', 'rejected', 'timeout',
+  'completed', 'canceled', 'unassigned', 'failed_contact',
+];
 
 // ---------------------------------------------------------------------------
 // POST /api/leads
@@ -153,7 +160,7 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
   // ── Assign worker (awaited — response reflects real outcome) ──
   let assignmentResult;
   try {
-    assignmentResult = await assignLead(leadId, city_id);
+    assignmentResult = await assignmentService.assignLead(leadId, city_id);
   } catch (err) {
     console.error(`[POST /leads] assignLead failed for lead ${leadId}:`, err);
     // Lead is already persisted; return 201 but flag that assignment failed
@@ -190,6 +197,13 @@ router.get('/', auth, async (req, res) => {
   const offset = Math.max(parseInt(req.query.offset, 10) || 0,  0);
   const status = req.query.status ?? null;
 
+  if (status !== null && !LEAD_STATUSES.includes(status)) {
+    return res.status(400).json({
+      error: `Unknown status "${status}". Allowed: ${LEAD_STATUSES.join(', ')}.`,
+      code:  'INVALID_STATUS',
+    });
+  }
+
   const SORT_MAP = {
     'created_at_desc': 'l.created_at DESC',
     'created_at_asc':  'l.created_at ASC',
@@ -216,12 +230,14 @@ router.get('/', auth, async (req, res) => {
 
     values.push(limit, offset);
     const { rows } = await pool.query(
-      `SELECT l.id, l.name, l.phone_normalized, l.service_type,
-              l.area, l.total_price, l.city_id, l.status,
-              l.created_at, l.updated_at,
+      `SELECT l.id, l.name, l.phone_normalized, l.phone_raw, l.service_type,
+              l.area, l.total_price, l.city_id, l.out_of_city, l.status,
+              l.comment, l.created_at, l.updated_at,
+              c.name AS city_name,
               w.id   AS worker_id,
               w.name AS worker_name
        FROM   leads l
+       LEFT JOIN cities  c ON c.id = l.city_id
        LEFT JOIN workers w ON w.id = l.worker_id
        ${where}
        ORDER BY ${orderBy}
@@ -251,13 +267,19 @@ router.get('/debug/stats', auth, async (req, res) => {
       `SELECT
          (SELECT COUNT(*) FROM leads)                                    AS total_leads,
          (SELECT COUNT(*) FROM workers WHERE is_active = TRUE)          AS active_workers,
-         (SELECT COUNT(*) FROM leads WHERE status IN ('new','assigned')) AS pending_leads`
+         (SELECT COUNT(*) FROM leads WHERE status IN ('new','assigned')) AS pending_leads,
+         (SELECT COUNT(*) FROM leads WHERE status = 'unassigned')       AS unassigned_leads,
+         (SELECT COUNT(*) FROM leads
+           WHERE created_at >= (date_trunc('day', NOW() AT TIME ZONE 'Europe/Kiev')
+                                AT TIME ZONE 'Europe/Kiev'))          AS today_leads`
     );
     const r = rows[0];
     res.json({
       total_leads:    parseInt(r.total_leads, 10),
       active_workers: parseInt(r.active_workers, 10),
       pending_leads:  parseInt(r.pending_leads, 10),
+      unassigned_leads: parseInt(r.unassigned_leads, 10),
+      today_leads:    parseInt(r.today_leads, 10),
     });
   } catch (err) {
     console.error('[GET /debug/stats]', err);
@@ -313,6 +335,40 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/leads/:id/assign  (admin) — manual assign to a concrete worker
+// ---------------------------------------------------------------------------
+
+router.post('/:id/assign', auth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: 'Invalid lead id', code: 'INVALID_INPUT' });
+  }
+
+  const workerId = parseInt(req.body?.worker_id, 10);
+  if (!Number.isFinite(workerId) || workerId < 1) {
+    return res.status(400).json({
+      error: 'Body must include a positive integer worker_id',
+      code:  'INVALID_INPUT',
+    });
+  }
+
+  try {
+    const result = await assignmentService.assignLeadToWorker(id, workerId);
+    return res.json(result);
+  } catch (err) {
+    const status = err.statusCode ?? 500;
+    if (status >= 500) {
+      console.error(`[POST /leads/${id}/assign]`, err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    return res.status(status).json({
+      error: err.message,
+      code:  err.code ?? undefined,
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // PATCH /api/leads/:id/cancel  (admin)
 // Cancel only allowed from: new, assigned, timeout
 // ---------------------------------------------------------------------------
@@ -324,32 +380,27 @@ router.patch('/:id/cancel', auth, async (req, res) => {
   }
 
   try {
-    // First read current status
-    const { rows: readRows } = await pool.query(
-      `SELECT id, status FROM leads WHERE id = $1`,
-      [id]
-    );
-
-    if (!readRows.length) {
-      return res.status(404).json({ error: 'Lead not found' });
-    }
-
-    const current = readRows[0].status;
-
-    if (!CANCELABLE_STATUSES.includes(current)) {
-      return res.status(400).json({
-        error: `Cannot cancel a lead with status "${current}". Allowed: ${CANCELABLE_STATUSES.join(', ')}.`,
-        code:  'INVALID_TRANSITION',
-      });
-    }
-
-    await pool.query(
+    // One conditional UPDATE: a worker accepting in parallel can't be overwritten.
+    const { rows } = await pool.query(
       `UPDATE leads
        SET    status     = 'canceled',
               updated_at = NOW()
-       WHERE  id = $1`,
-      [id]
+       WHERE  id = $1
+         AND  status = ANY($2::lead_status_enum[])
+       RETURNING id`,
+      [id, CANCELABLE_STATUSES]
     );
+
+    if (!rows.length) {
+      const { rows: current } = await pool.query(`SELECT status FROM leads WHERE id = $1`, [id]);
+      if (!current.length) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+      return res.status(400).json({
+        error: `Cannot cancel a lead with status "${current[0].status}". Allowed: ${CANCELABLE_STATUSES.join(', ')}.`,
+        code:  'INVALID_TRANSITION',
+      });
+    }
 
     return res.json({ lead_id: id, status: 'canceled' });
 

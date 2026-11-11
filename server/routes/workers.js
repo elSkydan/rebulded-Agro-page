@@ -4,12 +4,21 @@ const express = require('express');
 const router  = express.Router();
 const pool    = require('../../db/pool');
 const auth    = require('../middlewares/auth');
+const { mapDbError } = require('../utils/dbErrors');
+
+function sendDbError(res, err, logPrefix) {
+  console.error(`${logPrefix} [${err.code}]`, err.message);
+  const { status, body } = mapDbError(err);
+  return res.status(status).json(body);
+}
 
 // GET /api/workers
 router.get('/', auth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT w.id, w.name, w.city_id, w.priority, w.is_active,
+      `SELECT w.id, w.name, w.phone, w.telegram_chat_id, w.city_id,
+              w.equipment_type, w.priority, w.is_active,
+              w.last_assigned_at, w.created_at,
               c.name AS city_name
        FROM   workers w
        LEFT JOIN cities c ON c.id = w.city_id
@@ -24,7 +33,8 @@ router.get('/', auth, async (req, res) => {
 
 // POST /api/workers
 router.post('/', auth, async (req, res) => {
-  const { name, city_id, priority = 0, is_active = true, phone, telegram_chat_id, equipment_type } = req.body;
+  const { city_id, priority = 0, is_active = true, phone, telegram_chat_id, equipment_type } = req.body;
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : req.body.name;
 
   if (!name || !city_id) {
     return res.status(400).json({ error: 'name and city_id are required' });
@@ -46,8 +56,7 @@ router.post('/', auth, async (req, res) => {
     );
     res.status(201).json(rows[0]);
   } catch (err) {
-    console.error('[POST /workers]', err);
-    res.status(500).json({ error: 'Database error' });
+    sendDbError(res, err, '[POST /workers]');
   }
 });
 
@@ -62,7 +71,12 @@ router.patch('/:id', auth, async (req, res) => {
   const values = [];
   let idx = 1;
 
-  if (name             !== undefined) { fields.push(`name = $${idx++}`);              values.push(name); }
+  if (name             !== undefined) {
+    const trimmed = typeof name === 'string' ? name.trim() : '';
+    if (!trimmed) return res.status(400).json({ error: 'name must not be empty' });
+    fields.push(`name = $${idx++}`);
+    values.push(trimmed);
+  }
   if (city_id          !== undefined) { fields.push(`city_id = $${idx++}`);           values.push(city_id); }
   if (priority         !== undefined) { fields.push(`priority = $${idx++}`);          values.push(priority); }
   if (is_active        !== undefined) { fields.push(`is_active = $${idx++}`);         values.push(is_active); }
@@ -88,8 +102,7 @@ router.patch('/:id', auth, async (req, res) => {
     if (!rows.length) return res.status(404).json({ error: 'Worker not found' });
     res.json(rows[0]);
   } catch (err) {
-    console.error('[PATCH /workers/:id]', err);
-    res.status(500).json({ error: 'Database error' });
+    sendDbError(res, err, '[PATCH /workers/:id]');
   }
 });
 

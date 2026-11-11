@@ -371,3 +371,89 @@ describe('E. applyWorkerResponse — reject path transaction safety', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// F. assignLeadToWorker — admin manual assign
+// ---------------------------------------------------------------------------
+
+describe('F. assignLeadToWorker', () => {
+
+  test('happy path: times out previous sent, upserts assignment, updates lead', async () => {
+    const client = fakeClient([
+      { rows: [] }, // BEGIN
+      {
+        rows: [{
+          id: 41, status: 'unassigned', city_id: 1, worker_id: null,
+          name: 'Олена', phone_normalized: '+380671112233',
+          service_type: 'ogorod', area: '6', total_price: '1800',
+          out_of_city: false, comment: null, city_name: 'Харків',
+        }],
+      },
+      { rows: [{ id: 2, name: 'Іван', telegram_chat_id: '111', is_active: true, city_id: 1 }] },
+      { rows: [] }, // UPDATE lead_assignments → timeout previous sent
+      { rows: [] }, // INSERT … ON CONFLICT
+      { rows: [{ id: 41 }] }, // conditional UPDATE leads
+      { rows: [] }, // UPDATE workers.last_assigned_at
+      { rows: [] }, // COMMIT
+    ]);
+
+    const svc = loadServiceWithPool(fakePool(client));
+    const result = await svc.assignLeadToWorker(41, 2);
+
+    assert.deepEqual(result, {
+      lead_id: 41,
+      status: 'assigned',
+      worker_id: 2,
+      worker_name: 'Іван',
+    });
+
+    const sql = client.calls.map((c) => c.sql);
+    assert.ok(sql.some((s) => /SET\s+status\s*=\s*'timeout'/i.test(s) && /status\s*=\s*'sent'/i.test(s)));
+    assert.ok(sql.some((s) => /ON CONFLICT \(lead_id, worker_id\)/i.test(s)));
+    assert.ok(sql.some((s) => /last_sent_worker_id/i.test(s) && /status = ANY/i.test(s)));
+    assert.ok(sql.map((s) => s.trim().toUpperCase()).includes('COMMIT'));
+  });
+
+  test('400 INVALID_TRANSITION for accepted leads', async () => {
+    const client = fakeClient([
+      { rows: [] },
+      { rows: [{ id: 41, status: 'accepted', city_id: 1, worker_id: 2, city_name: 'Харків' }] },
+      { rows: [] }, // ROLLBACK
+    ]);
+    const svc = loadServiceWithPool(fakePool(client));
+
+    await assert.rejects(
+      () => svc.assignLeadToWorker(41, 3),
+      (err) => err.statusCode === 400 && err.code === 'INVALID_TRANSITION'
+    );
+  });
+
+  test('400 INVALID_WORKER when worker is inactive', async () => {
+    const client = fakeClient([
+      { rows: [] },
+      { rows: [{ id: 41, status: 'new', city_id: 1, worker_id: null, city_name: 'Харків' }] },
+      { rows: [{ id: 2, name: 'Іван', telegram_chat_id: '111', is_active: false, city_id: 1 }] },
+      { rows: [] }, // ROLLBACK
+    ]);
+    const svc = loadServiceWithPool(fakePool(client));
+
+    await assert.rejects(
+      () => svc.assignLeadToWorker(41, 2),
+      (err) => err.statusCode === 400 && err.code === 'INVALID_WORKER'
+    );
+  });
+
+  test('404 when lead is missing', async () => {
+    const client = fakeClient([
+      { rows: [] },
+      { rows: [] },
+      { rows: [] }, // ROLLBACK
+    ]);
+    const svc = loadServiceWithPool(fakePool(client));
+
+    await assert.rejects(
+      () => svc.assignLeadToWorker(999, 2),
+      (err) => err.statusCode === 404
+    );
+  });
+});

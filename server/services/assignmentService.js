@@ -870,11 +870,187 @@ async function rejectLead(workerId, leadId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// assignLeadToWorker — admin manual assign / reassign to a concrete worker
+//
+// Statuses that may move (or stay) to 'assigned' under operator control.
+// 'assigned' is included so the admin can pull a lead off one worker onto another.
+// ---------------------------------------------------------------------------
+
+const MANUALLY_ASSIGNABLE_STATUSES = [
+  'new',
+  'unassigned',
+  'timeout',
+  'assigned',
+  'rejected',
+];
+
+/**
+ * @param {number} leadId
+ * @param {number} workerId
+ * @returns {Promise<{ lead_id: number, status: 'assigned', worker_id: number, worker_name: string }>}
+ */
+async function assignLeadToWorker(leadId, workerId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: leadRows } = await client.query(
+      `SELECT l.id, l.status, l.city_id, l.worker_id,
+              l.name, l.phone_normalized,
+              l.service_type, l.area, l.total_price,
+              l.out_of_city, l.comment,
+              c.name AS city_name
+       FROM   leads l
+       LEFT JOIN cities c ON c.id = l.city_id
+       WHERE  l.id = $1
+       FOR UPDATE OF l`,
+      [leadId]
+    );
+
+    if (!leadRows.length) {
+      await client.query('ROLLBACK');
+      const err = new Error('Lead not found');
+      err.statusCode = 404;
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+
+    const lead = leadRows[0];
+
+    if (!MANUALLY_ASSIGNABLE_STATUSES.includes(lead.status)) {
+      await client.query('ROLLBACK');
+      const err = new Error(
+        `Cannot assign a lead with status "${lead.status}". Allowed: ${MANUALLY_ASSIGNABLE_STATUSES.join(', ')}.`
+      );
+      err.statusCode = 400;
+      err.code = 'INVALID_TRANSITION';
+      throw err;
+    }
+
+    const { rows: workerRows } = await client.query(
+      `SELECT id, name, telegram_chat_id, is_active, city_id
+       FROM   workers
+       WHERE  id = $1`,
+      [workerId]
+    );
+
+    if (!workerRows.length) {
+      await client.query('ROLLBACK');
+      const err = new Error('Worker not found');
+      err.statusCode = 404;
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+
+    const worker = workerRows[0];
+
+    if (!worker.is_active) {
+      await client.query('ROLLBACK');
+      const err = new Error('Worker is inactive');
+      err.statusCode = 400;
+      err.code = 'INVALID_WORKER';
+      throw err;
+    }
+
+    if (lead.status === 'assigned' && lead.worker_id === worker.id) {
+      await client.query('ROLLBACK');
+      const err = new Error('Lead is already assigned to this worker');
+      err.statusCode = 400;
+      err.code = 'ALREADY_ASSIGNED';
+      throw err;
+    }
+
+    // Close any pending send so the previous worker's timeout clock stops.
+    await client.query(
+      `UPDATE lead_assignments
+       SET    status = 'timeout'
+       WHERE  lead_id = $1
+         AND  status  = 'sent'`,
+      [leadId]
+    );
+
+    // Re-try of a previously tried worker is allowed for manual assign.
+    await client.query(
+      `INSERT INTO lead_assignments (lead_id, worker_id, status)
+       VALUES ($1, $2, 'sent')
+       ON CONFLICT (lead_id, worker_id) DO UPDATE
+       SET    status       = 'sent',
+              message_id   = NULL,
+              responded_at = NULL`,
+      [leadId, worker.id]
+    );
+
+    // Conditional UPDATE: if accept/cancel raced past our FOR UPDATE (shouldn't),
+    // or status left the assignable set, surface 409.
+    const { rows: updated } = await client.query(
+      `UPDATE leads
+       SET    status              = 'assigned',
+              worker_id           = $1,
+              last_sent_worker_id = $1,
+              updated_at          = NOW()
+       WHERE  id = $2
+         AND  status = ANY($3::lead_status_enum[])
+       RETURNING id`,
+      [worker.id, leadId, MANUALLY_ASSIGNABLE_STATUSES]
+    );
+
+    if (!updated.length) {
+      await client.query('ROLLBACK');
+      const err = new Error('Lead status changed concurrently');
+      err.statusCode = 409;
+      err.code = 'CONFLICT';
+      throw err;
+    }
+
+    await client.query(
+      `UPDATE workers SET last_assigned_at = NOW() WHERE id = $1`,
+      [worker.id]
+    );
+
+    await client.query('COMMIT');
+
+    log('lead_assigned_manual', leadId, worker.id);
+
+    const leadData = leadRows[0];
+    telegramService
+      .sendLeadToWorker(worker.telegram_chat_id, leadId, worker.id, leadData)
+      .then(messageId => {
+        if (messageId) {
+          pool.query(
+            `UPDATE lead_assignments SET message_id = $1
+             WHERE  lead_id = $2 AND worker_id = $3`,
+            [messageId, leadId, worker.id]
+          ).catch(err =>
+            console.error(`[telegram] persist message_id failed (lead ${leadId}):`, err.message)
+          );
+        }
+      })
+      .catch(err => console.error(`[telegram] sendLeadToWorker failed (lead ${leadId}):`, err.message));
+
+    return {
+      lead_id:     leadId,
+      status:      'assigned',
+      worker_id:   worker.id,
+      worker_name: worker.name,
+    };
+
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    console.error(`[assignLeadToWorker] lead ${leadId} worker ${workerId}:`, err.message);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   assignLead,
   reassignLead,
+  assignLeadToWorker,
   applyWorkerResponse,
   acceptLead,
   rejectLead,
   verifyWorkerTelegramIdentity,
+  MANUALLY_ASSIGNABLE_STATUSES,
 };
