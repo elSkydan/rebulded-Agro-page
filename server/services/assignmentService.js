@@ -776,7 +776,7 @@ async function acceptLead(workerId, leadId) {
     try { await client.query('ROLLBACK'); } catch (_) {}
 
     // PG error 23505 = unique_violation.
-    // uq_la_lead_accepted fires when two workers accept concurrently;
+    // uq_lead_assignments_lead_accepted fires when two workers accept concurrently;
     // the second transaction loses the race.  Return a clean business
     // response instead of letting a 500 reach the webhook handler.
     if (err.code === '23505') {

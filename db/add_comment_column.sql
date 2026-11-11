@@ -1,13 +1,9 @@
 -- ============================================================
---  add_comment_column.sql  —  Additive migration
---  Run AFTER schema.sql.
---  IDEMPOTENT: ADD COLUMN IF NOT EXISTS guard.
+--  DEPRECATED — kept for manual upgrades of pre-v2 databases.
+--  Prefer: npm run db:migrate  (applies db/schema.sql)
 --
---  Adds: leads.comment — optional free-text note from the client.
---
---  New installs using the updated schema.sql already include this
---  column — this file is safe to re-run and serves as an upgrade
---  path for existing databases created before this change.
+--  Everything below is already included in schema.sql.
+--  Safe to re-run (idempotent).
 -- ============================================================
 
 ALTER TABLE leads

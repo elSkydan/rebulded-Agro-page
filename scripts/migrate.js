@@ -3,8 +3,9 @@
 /**
  * scripts/migrate.js
  *
- * Applies the full schema to the target database.
- * Safe to run multiple times — all statements are idempotent.
+ * Applies db/schema.sql to the target database (tables, enums,
+ * indexes, column catch-up). Safe to run multiple times — all
+ * statements are idempotent.
  *
  * Usage:
  *   node scripts/migrate.js
