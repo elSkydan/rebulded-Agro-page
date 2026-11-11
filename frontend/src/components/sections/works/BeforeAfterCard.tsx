@@ -30,6 +30,7 @@ export function BeforeAfterCard({ item }: BeforeAfterCardProps) {
             alt={`${item.title} — фото до`}
             fill
             sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            loading="lazy"
             className="absolute inset-0 object-cover"
           />
           <Image
@@ -37,6 +38,7 @@ export function BeforeAfterCard({ item }: BeforeAfterCardProps) {
             alt={`${item.title} — фото після`}
             fill
             sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            loading="lazy"
             className={`ba-after absolute inset-0 object-cover ${showAfter ? 'opacity-100' : 'opacity-0'}`}
           />
         </button>

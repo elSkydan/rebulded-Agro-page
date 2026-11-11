@@ -12,7 +12,7 @@ export function Footer() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <Image src={logoIcon} alt="" className="h-8 w-8" />
+              <Image src={logoIcon} alt={siteConfig.name} className="h-8 w-8" />
               <span className="text-white font-semibold">{siteConfig.name}</span>
             </div>
             <p className="text-gray-400 text-sm">
@@ -30,15 +30,18 @@ export function Footer() {
           </div>
         </div>
 
-        <nav aria-label="Карта сайту" className="flex flex-wrap gap-x-6 gap-y-2 mt-8 pt-6 border-t border-gray-800">
-          <Link href="/" className="text-gray-400 hover:text-white text-sm transition-colors">
+        <nav aria-label="Карта сайту" className="flex flex-wrap gap-x-4 gap-y-1 mt-8 pt-6 border-t border-gray-800">
+          <Link
+            href="/"
+            className="inline-flex items-center min-h-11 px-2 text-gray-400 hover:text-white text-sm transition-colors"
+          >
             Головна
           </Link>
           {NAV_LINKS.map((link) => (
             <SiteNavLink
               key={link.href}
               href={link.href}
-              className="text-gray-400 hover:text-white text-sm transition-colors"
+              className="inline-flex items-center min-h-11 px-2 text-gray-400 hover:text-white text-sm transition-colors"
             >
               {link.label}
             </SiteNavLink>

@@ -8,7 +8,7 @@ export const siteConfig = {
   title: 'Вспашка, целина і покос у Харкові — Agro Aggregator',
   description:
     'Вспашка городу, обробка целини і покос трави в Харкові. Дизельний мотоблок Powercraft МБ 1012Д, ' +
-    'виїзд сьогодні. Ціни від 200 грн/сотку. Оплата після виконання роботи. Тел. +38 (067) 902-03-26.',
+    'виїзд сьогодні. Оранка від 300 грн/сот., покіс від 200 грн/сот. Оплата після виконання роботи. Тел. +38 (067) 902-03-26.',
   url: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3001',
   /** Displayed phone (footer / navbar / tel: links) */
   phone: process.env.NEXT_PUBLIC_PHONE ?? '+380679020326',
