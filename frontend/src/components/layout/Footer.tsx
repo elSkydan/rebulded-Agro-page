@@ -5,6 +5,9 @@ import { FOOTER_LINKS, NAV_LINKS } from '@/lib/content';
 import { SiteNavLink } from '@/components/layout/SiteNavLink';
 import logoIcon from '@/assets/logo-icon.png';
 
+const navLinkClass =
+  'inline-flex items-center min-h-11 px-2 text-gray-400 hover:text-white text-sm transition-colors';
+
 export function Footer() {
   return (
     <footer className="bg-gray-900 py-10">
@@ -30,38 +33,36 @@ export function Footer() {
           </div>
         </div>
 
-        <nav aria-label="Карта сайту" className="flex flex-wrap gap-x-4 gap-y-1 mt-8 pt-6 border-t border-gray-800">
-          <Link
-            href="/"
-            className="inline-flex items-center min-h-11 px-2 text-gray-400 hover:text-white text-sm transition-colors"
+        <div className="mt-8 pt-6 border-t border-gray-800 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <nav
+            aria-label="Юридична інформація"
+            className="flex flex-wrap gap-x-4 gap-y-1"
           >
-            Головна
-          </Link>
-          {NAV_LINKS.map((link) => (
-            <SiteNavLink
-              key={link.href}
-              href={link.href}
-              className="inline-flex items-center min-h-11 px-2 text-gray-400 hover:text-white text-sm transition-colors"
-            >
-              {link.label}
-            </SiteNavLink>
-          ))}
-        </nav>
+            {FOOTER_LINKS.map((link) => (
+              <SiteNavLink
+                key={link.href}
+                href={link.href}
+                className="inline-flex items-center min-h-11 px-2 text-gray-500 hover:text-white text-sm transition-colors"
+              >
+                {link.label}
+              </SiteNavLink>
+            ))}
+          </nav>
 
-        <nav
-          aria-label="Юридична інформація"
-          className="flex flex-wrap gap-x-4 gap-y-1 mt-2"
-        >
-          {FOOTER_LINKS.map((link) => (
-            <SiteNavLink
-              key={link.href}
-              href={link.href}
-              className="inline-flex items-center min-h-11 px-2 text-gray-500 hover:text-white text-sm transition-colors"
-            >
-              {link.label}
-            </SiteNavLink>
-          ))}
-        </nav>
+          <nav
+            aria-label="Карта сайту"
+            className="flex flex-wrap gap-x-4 gap-y-1 sm:justify-end sm:max-w-xl"
+          >
+            <Link href="/" className={navLinkClass}>
+              Головна
+            </Link>
+            {NAV_LINKS.map((link) => (
+              <SiteNavLink key={link.href} href={link.href} className={navLinkClass}>
+                {link.label}
+              </SiteNavLink>
+            ))}
+          </nav>
+        </div>
 
         <div className="border-t border-gray-800 mt-6 pt-6 text-gray-500 text-xs space-y-2">
           <p>
