@@ -66,7 +66,30 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
 };
 
 /** Mirrors CANCELABLE_STATUSES in server/routes/leads.js. */
-export const CANCELABLE_LEAD_STATUSES: ReadonlySet<LeadStatus> = new Set(['new', 'assigned', 'timeout']);
+export const CANCELABLE_LEAD_STATUSES: ReadonlySet<LeadStatus> = new Set([
+  'new',
+  'assigned',
+  'timeout',
+  'unassigned',
+]);
+
+/**
+ * Statuses where worker_id is the *current* assignee shown in the row.
+ * For unassigned/new/canceled the UI must not show a stale worker name.
+ */
+export const LEAD_STATUSES_WITH_CURRENT_WORKER: ReadonlySet<LeadStatus> = new Set([
+  'assigned',
+  'accepted',
+  'rejected',
+  'timeout',
+  'completed',
+  'failed_contact',
+]);
+
+export function leadWorkerLabel(lead: Pick<Lead, 'status' | 'worker_name'>): string {
+  if (!LEAD_STATUSES_WITH_CURRENT_WORKER.has(lead.status)) return '—';
+  return lead.worker_name ?? '—';
+}
 
 /** Mirrors MANUALLY_ASSIGNABLE_STATUSES in server/services/assignmentService.js. */
 export const ASSIGNABLE_LEAD_STATUSES: ReadonlySet<LeadStatus> = new Set([

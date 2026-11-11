@@ -109,6 +109,16 @@ export function createAdminApi(
     },
     assignLead: (id, workerId) =>
       request<AssignLeadResult>('POST', `/api/leads/${id}/assign`, { worker_id: workerId }),
-    getStats: () => request<LeadStats>('GET', '/api/leads/debug/stats'),
+    getStats: async () => {
+      const raw = await request<Partial<LeadStats>>('GET', '/api/leads/debug/stats');
+      const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+      return {
+        total_leads: n(raw.total_leads),
+        active_workers: n(raw.active_workers),
+        pending_leads: n(raw.pending_leads),
+        unassigned_leads: n(raw.unassigned_leads),
+        today_leads: n(raw.today_leads),
+      };
+    },
   };
 }

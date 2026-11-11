@@ -60,6 +60,21 @@ describe('AdminApp — leads', () => {
     expect(within(row).getByText(/11\.11 14:05/)).toBeTruthy();
   });
 
+  it('does not show a stale worker name on unassigned leads', async () => {
+    fakeBackend({
+      leads: [makeLead({ status: 'unassigned', worker_id: 9, worker_name: 'Skydan Konstantin' })],
+      stats: { total_leads: 3, active_workers: 1, pending_leads: 0, unassigned_leads: 2, today_leads: 3 },
+    });
+    render(<AdminApp />);
+    await screen.findByRole('heading', { name: 'Заявки (1)' });
+    const row = leadRow(41);
+    expect(within(row).getByText('Без виконавця')).toBeTruthy();
+    expect(within(row).getByText(/Виконавець:\s*—/)).toBeTruthy();
+    expect(within(row).queryByText(/Skydan/)).toBeNull();
+    expect(within(tile('Без виконавця')).getByText('2')).toBeTruthy();
+    expect(within(tile('Сьогодні')).getByText('3')).toBeTruthy();
+  });
+
   it('shows an empty state', async () => {
     fakeBackend();
     render(<AdminApp />);

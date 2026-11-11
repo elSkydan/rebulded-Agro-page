@@ -10,6 +10,7 @@ import {
   EQUIPMENT_LABELS,
   LEAD_STATUS_LABELS,
   SERVICE_TYPE_LABELS,
+  leadWorkerLabel,
   type Lead,
   type LeadStats,
   type LeadStatus,
@@ -313,11 +314,13 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
 }
 
 function StatsBar({ stats }: { stats: LeadStats | null }) {
+  // Once stats loaded, always show numbers (0), never "—" for a missing key.
+  const num = (v: number | undefined) => (stats == null ? undefined : (v ?? 0));
   const tiles: { label: string; value: number | undefined; alert?: boolean }[] = [
-    { label: 'Сьогодні', value: stats?.today_leads },
-    { label: 'Очікують', value: stats?.pending_leads },
-    { label: 'Без виконавця', value: stats?.unassigned_leads, alert: (stats?.unassigned_leads ?? 0) > 0 },
-    { label: 'Активні виконавці', value: stats?.active_workers },
+    { label: 'Сьогодні', value: num(stats?.today_leads) },
+    { label: 'Очікують', value: num(stats?.pending_leads) },
+    { label: 'Без виконавця', value: num(stats?.unassigned_leads), alert: (stats?.unassigned_leads ?? 0) > 0 },
+    { label: 'Активні виконавці', value: num(stats?.active_workers) },
   ];
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
@@ -411,7 +414,7 @@ function LeadRow({
           {lead.city_name ?? '—'}
           {lead.out_of_city ? ' · за містом' : ''}
         </p>
-        <p className="text-gray-700">Виконавець: {lead.worker_name ?? '—'}</p>
+        <p className="text-gray-700">Виконавець: {leadWorkerLabel(lead)}</p>
       </div>
 
       {lead.comment && (

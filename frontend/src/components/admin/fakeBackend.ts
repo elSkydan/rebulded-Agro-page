@@ -73,7 +73,7 @@ interface Options {
   failWith?: { status: number; body: object };
 }
 
-const CANCELABLE = new Set(['new', 'assigned', 'timeout']);
+const CANCELABLE = new Set(['new', 'assigned', 'timeout', 'unassigned']);
 const ASSIGNABLE = new Set(['new', 'unassigned', 'timeout', 'assigned', 'rejected']);
 
 export function fakeBackend(opts: Options = {}) {

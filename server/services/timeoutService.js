@@ -196,7 +196,11 @@ async function handleLeadTimeout(leadId) {
 
     if (acceptedCount === 0) {
       await client.query(
-        `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
+        `UPDATE leads
+         SET    status     = 'unassigned',
+                worker_id  = NULL,
+                updated_at = NOW()
+         WHERE  id = $1`,
         [leadId]
       );
       await client.query('COMMIT');

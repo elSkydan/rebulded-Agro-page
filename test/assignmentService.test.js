@@ -414,6 +414,38 @@ describe('F. assignLeadToWorker', () => {
     assert.ok(sql.map((s) => s.trim().toUpperCase()).includes('COMMIT'));
   });
 
+  test('reassignLead clears worker_id when falling back to unassigned', async () => {
+    const client = fakeClient([
+      { rows: [] }, // BEGIN
+      {
+        rows: [{
+          id: 41, status: 'timeout', city_id: 1, worker_id: 7,
+          name: 'Олена', phone_normalized: '+380671112233',
+          service_type: 'ogorod', area: '6', total_price: '1800',
+          out_of_city: false, comment: null, city_name: 'Харків',
+        }],
+      },
+      { rows: [] }, // mark previous assignment timeout (status already timeout)
+      { rows: [] }, // pickWorker → none
+      { rows: [{ n: '0' }] }, // pickWorker diagnostics (4)
+      { rows: [{ n: '0' }] },
+      { rows: [{ n: '0' }] },
+      { rows: [{ n: '0' }] },
+      { rows: [] }, // UPDATE unassigned + clear worker_id
+      { rows: [] }, // COMMIT
+    ]);
+
+    const svc = loadServiceWithPool(fakePool(client));
+    const result = await svc.reassignLead(41, 'timeout');
+    assert.equal(result.status, 'unassigned');
+
+    const unassignSql = client.calls.map((c) => c.sql).find(
+      (s) => /status\s*=\s*'unassigned'/i.test(s) && /UPDATE\s+leads/i.test(s)
+    );
+    assert.ok(unassignSql, 'should UPDATE leads to unassigned');
+    assert.match(unassignSql, /worker_id\s*=\s*NULL/i);
+  });
+
   test('400 INVALID_TRANSITION for accepted leads', async () => {
     const client = fakeClient([
       { rows: [] },
