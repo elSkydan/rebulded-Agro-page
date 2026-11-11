@@ -33,7 +33,16 @@ stub('db/pool', {
   },
 });
 stub('config/config', { ...require('../config/config'), ADMIN_TOKEN: TOKEN });
-stub('server/services/assignmentService', { assignLead: async () => ({ assigned: false }) });
+const assignmentStub = {
+  assignLead: async () => ({ assigned: false }),
+  assignLeadToWorker: async () => ({
+    lead_id: 5,
+    status: 'assigned',
+    worker_id: 2,
+    worker_name: 'Іван',
+  }),
+};
+stub('server/services/assignmentService', assignmentStub);
 
 const leadsRoute = require('../server/routes/leads');
 
@@ -122,5 +131,63 @@ describe('PATCH /api/leads/:id/cancel', () => {
     results = [{ rows: [] }, { rows: [] }];
     const res = await fetch(`${base}/999/cancel`, { method: 'PATCH', headers: auth });
     assert.equal(res.status, 404);
+  });
+});
+
+describe('POST /api/leads/:id/assign', () => {
+  test('requires auth', async () => {
+    const res = await fetch(`${base}/5/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ worker_id: 2 }),
+    });
+    assert.equal(res.status, 401);
+  });
+
+  test('400 INVALID_INPUT when worker_id is missing', async () => {
+    const res = await fetch(`${base}/5/assign`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).code, 'INVALID_INPUT');
+  });
+
+  test('delegates to assignLeadToWorker and returns its payload', async () => {
+    const res = await fetch(`${base}/5/assign`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ worker_id: 2 }),
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), {
+      lead_id: 5,
+      status: 'assigned',
+      worker_id: 2,
+      worker_name: 'Іван',
+    });
+  });
+
+  test('maps service statusCode / code onto the HTTP response', async () => {
+    const err = new Error('Worker is inactive');
+    err.statusCode = 400;
+    err.code = 'INVALID_WORKER';
+    assignmentStub.assignLeadToWorker = async () => { throw err; };
+
+    const res = await fetch(`${base}/5/assign`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ worker_id: 9 }),
+    });
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), { error: 'Worker is inactive', code: 'INVALID_WORKER' });
+
+    assignmentStub.assignLeadToWorker = async () => ({
+      lead_id: 5,
+      status: 'assigned',
+      worker_id: 2,
+      worker_name: 'Іван',
+    });
   });
 });

@@ -68,6 +68,15 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
 /** Mirrors CANCELABLE_STATUSES in server/routes/leads.js. */
 export const CANCELABLE_LEAD_STATUSES: ReadonlySet<LeadStatus> = new Set(['new', 'assigned', 'timeout']);
 
+/** Mirrors MANUALLY_ASSIGNABLE_STATUSES in server/services/assignmentService.js. */
+export const ASSIGNABLE_LEAD_STATUSES: ReadonlySet<LeadStatus> = new Set([
+  'new',
+  'unassigned',
+  'timeout',
+  'assigned',
+  'rejected',
+]);
+
 export type LeadServiceType = 'ogorod' | 'celina' | 'mowing' | 'tree' | 'washing';
 
 export const SERVICE_TYPE_LABELS: Record<LeadServiceType, string> = {

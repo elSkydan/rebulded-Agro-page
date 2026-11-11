@@ -74,6 +74,7 @@ interface Options {
 }
 
 const CANCELABLE = new Set(['new', 'assigned', 'timeout']);
+const ASSIGNABLE = new Set(['new', 'unassigned', 'timeout', 'assigned', 'rejected']);
 
 export function fakeBackend(opts: Options = {}) {
   let workers = [...(opts.workers ?? [])];
@@ -117,6 +118,26 @@ export function fakeBackend(opts: Options = {}) {
       lead.status = 'canceled';
       stats.pending_leads = Math.max(0, stats.pending_leads - 1);
       return json(200, { lead_id: lead.id, status: 'canceled' });
+    }
+    const assign = pathname.match(/^\/api\/leads\/(\d+)\/assign$/);
+    if (assign && method === 'POST') {
+      const lead = leads.find((l) => l.id === Number(assign[1]));
+      if (!lead) return json(404, { error: 'Lead not found' });
+      if (!ASSIGNABLE.has(lead.status)) return json(400, { error: 'Cannot assign', code: 'INVALID_TRANSITION' });
+      const worker = workers.find((w) => w.id === Number(body?.worker_id));
+      if (!worker) return json(404, { error: 'Worker not found' });
+      if (!worker.is_active) return json(400, { error: 'Worker is inactive', code: 'INVALID_WORKER' });
+      const wasUnassigned = lead.status === 'unassigned';
+      lead.status = 'assigned';
+      lead.worker_id = worker.id;
+      lead.worker_name = worker.name;
+      if (wasUnassigned) stats.unassigned_leads = Math.max(0, stats.unassigned_leads - 1);
+      return json(200, {
+        lead_id: lead.id,
+        status: 'assigned',
+        worker_id: worker.id,
+        worker_name: worker.name,
+      });
     }
 
     if (pathname === '/api/workers' && method === 'GET') return json(200, workers);

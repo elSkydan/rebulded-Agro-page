@@ -5,12 +5,15 @@ import { MessageSquareText, Phone, RefreshCw } from 'lucide-react';
 import { AdminApiError, createAdminApi } from '@/lib/admin/api';
 import { formatArea, formatKyivDateTime, formatMoney } from '@/lib/admin/format';
 import {
+  ASSIGNABLE_LEAD_STATUSES,
   CANCELABLE_LEAD_STATUSES,
+  EQUIPMENT_LABELS,
   LEAD_STATUS_LABELS,
   SERVICE_TYPE_LABELS,
   type Lead,
   type LeadStats,
   type LeadStatus,
+  type Worker,
 } from '@/lib/admin/types';
 
 interface Props {
@@ -34,6 +37,16 @@ const STATUS_BADGE: Record<LeadStatus, string> = {
   failed_contact: 'bg-gray-100 text-gray-600',
 };
 
+/** Active same-city first, then other active, inactive last (disabled in the select). */
+export function sortWorkersForLead(workers: Worker[], cityId: number): Worker[] {
+  return [...workers].sort((a, b) => {
+    const rank = (w: Worker) => (w.is_active ? (w.city_id === cityId ? 0 : 1) : 2);
+    const diff = rank(a) - rank(b);
+    if (diff !== 0) return diff;
+    return a.name.localeCompare(b.name, 'uk');
+  });
+}
+
 export function LeadsPanel({ token, onUnauthorized }: Props) {
   const api = useMemo(() => createAdminApi(token), [token]);
   const [statusFilter, setStatusFilter] = useState<LeadStatus | ''>('');
@@ -44,6 +57,10 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
   const [stats, setStats] = useState<LeadStats | null>(null);
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [cancelingId, setCancelingId] = useState<number | null>(null);
+  const [assignId, setAssignId] = useState<number | null>(null);
+  const [assigningId, setAssigningId] = useState<number | null>(null);
+  const [workers, setWorkers] = useState<Worker[] | null>(null);
+  const [workersError, setWorkersError] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   /** Guards against an older (slower) response overwriting a newer filter's results. */
   const requestSeq = useRef(0);
@@ -96,6 +113,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
   function changeFilter(next: LeadStatus | '') {
     setStatusFilter(next);
     setConfirmId(null);
+    setAssignId(null);
     setLoad({ status: 'loading' });
     void fetchFirstPage(next);
   }
@@ -103,6 +121,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
   function refresh() {
     setBanner(null);
     setConfirmId(null);
+    setAssignId(null);
     setLoad({ status: 'loading' });
     void fetchFirstPage(statusFilter);
     void fetchStats();
@@ -131,6 +150,27 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
     }
   }
 
+  async function ensureWorkers() {
+    if (workers) return workers;
+    setWorkersError(null);
+    try {
+      const list = await api.listWorkers();
+      setWorkers(list);
+      return list;
+    } catch (err) {
+      const message = handleError(err, 'Не вдалося завантажити виконавців');
+      if (message) setWorkersError(message);
+      return null;
+    }
+  }
+
+  async function openAssign(id: number) {
+    setBanner(null);
+    setConfirmId(null);
+    setAssignId(id);
+    await ensureWorkers();
+  }
+
   async function cancelLead(id: number) {
     setBanner(null);
     setCancelingId(id);
@@ -148,6 +188,28 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
     }
   }
 
+  async function assignLead(id: number, workerId: number) {
+    setBanner(null);
+    setAssigningId(id);
+    try {
+      const result = await api.assignLead(id, workerId);
+      setLeads((list) =>
+        list.map((l) =>
+          l.id === id
+            ? { ...l, status: 'assigned', worker_id: result.worker_id, worker_name: result.worker_name }
+            : l,
+        ),
+      );
+      setAssignId(null);
+      void fetchStats();
+    } catch (err) {
+      const message = handleError(err, 'Не вдалося призначити виконавця');
+      if (message) setBanner(message);
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
   return (
     <section>
       <StatsBar stats={stats} />
@@ -156,7 +218,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
         <h1 className="text-2xl font-bold text-gray-900">
           Заявки{load.status === 'ready' ? ` (${total})` : ''}
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <label htmlFor="lead-status-filter" className="text-sm font-medium text-gray-600">
             Статус
           </label>
@@ -164,7 +226,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
             id="lead-status-filter"
             value={statusFilter}
             onChange={(e) => changeFilter(e.target.value as LeadStatus | '')}
-            className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+            className="min-h-11 flex-1 sm:flex-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
           >
             <option value="">Усі</option>
             {(Object.keys(LEAD_STATUS_LABELS) as LeadStatus[]).map((s) => (
@@ -178,7 +240,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
             onClick={refresh}
             aria-label="Оновити"
             title="Оновити"
-            className="p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+            className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100"
           >
             <RefreshCw className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -196,7 +258,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
       {load.status === 'error' && (
         <div role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 flex items-center justify-between gap-4">
           <span>{load.message}</span>
-          <button type="button" onClick={refresh} className="font-semibold hover:underline">
+          <button type="button" onClick={refresh} className="font-semibold hover:underline min-h-11 px-2">
             Спробувати ще раз
           </button>
         </div>
@@ -216,9 +278,19 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
                   lead={lead}
                   confirming={confirmId === lead.id}
                   canceling={cancelingId === lead.id}
-                  onAskCancel={() => setConfirmId(lead.id)}
+                  assigning={assigningId === lead.id}
+                  assignOpen={assignId === lead.id}
+                  workers={workers}
+                  workersError={assignId === lead.id ? workersError : null}
+                  onAskCancel={() => {
+                    setAssignId(null);
+                    setConfirmId(lead.id);
+                  }}
                   onConfirmCancel={() => cancelLead(lead.id)}
                   onDeclineCancel={() => setConfirmId(null)}
+                  onAskAssign={() => void openAssign(lead.id)}
+                  onConfirmAssign={(workerId) => void assignLead(lead.id, workerId)}
+                  onDeclineAssign={() => setAssignId(null)}
                 />
               ))}
             </ul>
@@ -228,7 +300,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
                   type="button"
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="px-5 py-2.5 rounded-xl font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-60"
+                  className="min-h-11 px-5 py-2.5 rounded-xl font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-60"
                 >
                   {loadingMore ? 'Завантаження…' : 'Показати ще'}
                 </button>
@@ -270,13 +342,46 @@ interface LeadRowProps {
   lead: Lead;
   confirming: boolean;
   canceling: boolean;
+  assigning: boolean;
+  assignOpen: boolean;
+  workers: Worker[] | null;
+  workersError: string | null;
   onAskCancel: () => void;
   onConfirmCancel: () => void;
   onDeclineCancel: () => void;
+  onAskAssign: () => void;
+  onConfirmAssign: (workerId: number) => void;
+  onDeclineAssign: () => void;
 }
 
-function LeadRow({ lead, confirming, canceling, onAskCancel, onConfirmCancel, onDeclineCancel }: LeadRowProps) {
+function LeadRow({
+  lead,
+  confirming,
+  canceling,
+  assigning,
+  assignOpen,
+  workers,
+  workersError,
+  onAskCancel,
+  onConfirmCancel,
+  onDeclineCancel,
+  onAskAssign,
+  onConfirmAssign,
+  onDeclineAssign,
+}: LeadRowProps) {
   const cancelable = CANCELABLE_LEAD_STATUSES.has(lead.status);
+  const assignable = ASSIGNABLE_LEAD_STATUSES.has(lead.status);
+  const sorted = useMemo(
+    () => (workers ? sortWorkersForLead(workers, lead.city_id) : []),
+    [workers, lead.city_id],
+  );
+  const defaultWorkerId = sorted.find((w) => w.is_active)?.id ?? '';
+  const [selectedWorkerId, setSelectedWorkerId] = useState<number | ''>(defaultWorkerId);
+
+  useEffect(() => {
+    if (assignOpen) setSelectedWorkerId(defaultWorkerId);
+  }, [assignOpen, defaultWorkerId]);
+
   return (
     <li aria-label={`Заявка #${lead.id}`} className="px-5 py-4 text-sm">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
@@ -292,7 +397,7 @@ function LeadRow({ lead, confirming, canceling, onAskCancel, onConfirmCancel, on
           <span className="font-medium text-gray-900">{lead.name || 'Без імені'}</span>
           <a
             href={`tel:${lead.phone_normalized}`}
-            className="inline-flex items-center gap-1 text-primary font-medium hover:underline tabular-nums"
+            className="inline-flex items-center gap-1 text-primary font-medium hover:underline tabular-nums min-h-11"
           >
             <Phone className="w-3.5 h-3.5" aria-hidden="true" />
             {lead.phone_normalized}
@@ -316,16 +421,64 @@ function LeadRow({ lead, confirming, canceling, onAskCancel, onConfirmCancel, on
         </p>
       )}
 
-      {cancelable && (
-        <div className="mt-3">
-          {confirming ? (
+      {(assignable || cancelable) && (
+        <div className="mt-3 flex flex-col gap-2">
+          {assignOpen ? (
+            <div className="bg-primary/5 border border-primary/20 rounded-xl px-3 py-3 text-gray-800">
+              <p className="font-medium mb-2">Призначити заявку #{lead.id}</p>
+              {workersError ? (
+                <p role="alert" className="text-sm text-red-700 mb-2">
+                  {workersError}
+                </p>
+              ) : workers === null ? (
+                <p className="text-sm text-gray-500 mb-2">Завантаження виконавців…</p>
+              ) : sorted.length === 0 ? (
+                <p className="text-sm text-gray-500 mb-2">Немає виконавців</p>
+              ) : (
+                <label className="block mb-3">
+                  <span className="sr-only">Виконавець</span>
+                  <select
+                    value={selectedWorkerId === '' ? '' : String(selectedWorkerId)}
+                    onChange={(e) => setSelectedWorkerId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full min-h-11 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                  >
+                    {sorted.map((w) => (
+                      <option key={w.id} value={w.id} disabled={!w.is_active}>
+                        {w.name}
+                        {w.city_name ? ` (${w.city_name})` : ''} · {EQUIPMENT_LABELS[w.equipment_type]}
+                        {!w.is_active ? ' — неактивний' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => selectedWorkerId !== '' && onConfirmAssign(selectedWorkerId)}
+                  disabled={assigning || selectedWorkerId === '' || workers === null}
+                  className="min-h-11 px-4 rounded-xl font-semibold text-white bg-primary hover:bg-primary-dark disabled:opacity-60"
+                >
+                  Призначити
+                </button>
+                <button
+                  type="button"
+                  onClick={onDeclineAssign}
+                  disabled={assigning}
+                  className="min-h-11 px-4 rounded-xl font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+                >
+                  Скасувати
+                </button>
+              </div>
+            </div>
+          ) : confirming ? (
             <div className="inline-flex flex-wrap items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-red-800">
               <span>Скасувати заявку #{lead.id}?</span>
               <button
                 type="button"
                 onClick={onConfirmCancel}
                 disabled={canceling}
-                className="px-3 py-1 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60"
+                className="min-h-11 px-4 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60"
               >
                 Так
               </button>
@@ -333,15 +486,32 @@ function LeadRow({ lead, confirming, canceling, onAskCancel, onConfirmCancel, on
                 type="button"
                 onClick={onDeclineCancel}
                 disabled={canceling}
-                className="px-3 py-1 rounded-lg font-semibold hover:bg-red-100"
+                className="min-h-11 px-4 rounded-lg font-semibold hover:bg-red-100"
               >
                 Ні
               </button>
             </div>
           ) : (
-            <button type="button" onClick={onAskCancel} className="text-sm font-medium text-red-600 hover:underline">
-              Скасувати
-            </button>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              {assignable && (
+                <button
+                  type="button"
+                  onClick={onAskAssign}
+                  className="min-h-11 text-sm font-medium text-primary hover:underline"
+                >
+                  Призначити
+                </button>
+              )}
+              {cancelable && (
+                <button
+                  type="button"
+                  onClick={onAskCancel}
+                  className="min-h-11 text-sm font-medium text-red-600 hover:underline"
+                >
+                  Скасувати
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}

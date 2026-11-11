@@ -29,6 +29,7 @@ export function LoginForm({ notice, onLogin }: Props) {
       onLogin(value);
     } catch (err) {
       setError(err instanceof AdminApiError ? err.message : 'Не вдалося увійти');
+    } finally {
       setBusy(false);
     }
   }

@@ -40,15 +40,15 @@ export function AdminApp() {
   return (
     <div className="min-h-dvh bg-gray-50">
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <p className="font-bold text-gray-900">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-14 py-2 flex items-center justify-between gap-3">
+          <p className="font-bold text-gray-900 text-sm sm:text-base truncate">
             Agro Aggregator <span className="text-gray-400 font-medium">· Адмінка</span>
           </p>
           {token && (
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-1.5 rounded-lg hover:bg-gray-100"
+              className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 min-h-11 px-3 rounded-lg hover:bg-gray-100"
             >
               <LogOut className="w-4 h-4" aria-hidden="true" />
               Вийти
@@ -70,7 +70,7 @@ export function AdminApp() {
                   aria-selected={tab === t.id}
                   aria-controls={`admin-panel-${t.id}`}
                   onClick={() => setTab(t.id)}
-                  className={`-mb-px px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                  className={`-mb-px min-h-11 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
                     tab === t.id
                       ? 'border-primary text-primary'
                       : 'border-transparent text-gray-500 hover:text-gray-800'

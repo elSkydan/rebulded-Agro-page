@@ -201,3 +201,67 @@ Telegram side needs no change: a worker pressing a button on a canceled lead alr
 - Frontend: `format.test.ts` (Kyiv time, money, area); `api.test.ts` (query string, cancel, stats);
   `AdminApp.test.tsx` (default tab, summary, filter → request, cancel flow + stats refresh, no cancel for accepted,
   load more, tel link, switching to workers).
+
+---
+
+## 9. Phase 1c — Manual lead assign («Призначення»)
+
+Goal: the operator can pick a concrete worker for a stuck / new / mistargeted lead
+without waiting for auto-distribution. Uses the same assignment pipeline (DB + Telegram).
+
+### Backend
+
+`POST /api/leads/:id/assign` `{ "worker_id": number }` — admin auth.
+
+| HTTP | When | `code` |
+|---|---|---|
+| 200 | assigned | — |
+| 400 | body missing/invalid `worker_id`; lead status not assignable; worker inactive; already that worker | `INVALID_INPUT` / `INVALID_TRANSITION` / `INVALID_WORKER` / `ALREADY_ASSIGNED` |
+| 404 | lead or worker missing | — |
+| 409 | conditional UPDATE lost a race (accepted/canceled in parallel) | `CONFLICT` |
+
+Assignable lead statuses (must be able to reach `assigned` via the state machine):
+`new | unassigned | timeout | assigned | rejected`.
+
+Not assignable: `accepted | completed | canceled | failed_contact`.
+
+Service `assignLeadToWorker(leadId, workerId)` (in `assignmentService`):
+
+1. `BEGIN` → `SELECT lead … FOR UPDATE OF l` (join city for Telegram payload).
+2. Validate status ∈ assignable; load worker; require `is_active`.
+3. Close previous send: `UPDATE lead_assignments SET status='timeout' WHERE lead_id AND status='sent'`
+   (clears the pending timeout clock for the previous worker).
+4. Upsert assignment for the target worker as `sent`
+   (`ON CONFLICT (lead_id, worker_id) DO UPDATE` — allows re-trying a previously tried worker).
+5. Conditional `UPDATE leads SET status='assigned', worker_id, last_sent_worker_id, updated_at=NOW()
+   WHERE id AND status = ANY(assignable) RETURNING …` → 0 rows → `409 CONFLICT`.
+6. `UPDATE workers.last_assigned_at`, `COMMIT`.
+7. After commit: `sendLeadToWorker` (same as `assignLead`; Telegram failure does not roll back).
+
+Response body for the UI row patch:
+`{ lead_id, status: 'assigned', worker_id, worker_name }`.
+
+### UI
+
+On each assignable row: **Призначити** → inline panel:
+
+```
+Призначити заявку #41
+Виконавець: [ Іван (Харків) · Мотоблок ▾ ]   ← active same-city first, then other active; inactive disabled
+[Призначити] [Скасувати]
+```
+
+- Worker list from `GET /api/workers` (loaded once when the panel first opens assign).
+- Sort: active + same `city_id` → active other cities → inactive (disabled).
+- After success: row shows «Призначена» + worker name; summary refetch.
+- No button for non-assignable statuses; cancel + assign can coexist (e.g. `new`/`assigned`/`timeout`).
+- Touch targets ≥ 44px for confirm / deny / assign actions (mobile).
+
+### Tests (before code)
+
+- Backend `test/leadsRoute.test.js`: POST assign happy path calls service; 400 bad body / inactive;
+  404 missing; service error `statusCode` mapped; auth required.
+- Backend `test/assignmentService.test.js` (or dedicated): marks previous `sent` → `timeout`;
+  upserts assignment; conditional lead UPDATE; rejects bad status / inactive worker.
+- Frontend: `api.test.ts` POSTs `{worker_id}`; `AdminApp.leads.test.tsx` — assign flow updates row + stats;
+  no «Призначити» on `accepted`; worker select prefers city mates.

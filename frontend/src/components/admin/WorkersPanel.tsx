@@ -114,7 +114,7 @@ export function WorkersPanel({ token, onUnauthorized }: Props) {
           type="button"
           onClick={() => setDialog({ mode: 'create' })}
           aria-label="Додати виконавця"
-          className="shrink-0 inline-flex items-center gap-1.5 bg-primary hover:bg-primary-dark text-white font-semibold px-4 py-2 rounded-xl transition-colors"
+          className="shrink-0 inline-flex items-center gap-1.5 bg-primary hover:bg-primary-dark text-white font-semibold min-h-11 px-4 py-2 rounded-xl transition-colors"
         >
           <Plus className="w-4 h-4" aria-hidden="true" />
           <span className="sm:hidden">Додати</span>
@@ -177,7 +177,7 @@ export function WorkersPanel({ token, onUnauthorized }: Props) {
                     type="button"
                     onClick={() => toggleActive(w)}
                     disabled={pendingIds.has(w.id)}
-                    className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                    className="min-h-11 text-xs font-medium text-primary hover:underline disabled:opacity-50"
                   >
                     {w.is_active ? 'Деактивувати' : 'Активувати'}
                   </button>
@@ -188,7 +188,7 @@ export function WorkersPanel({ token, onUnauthorized }: Props) {
                     onClick={() => setDialog({ mode: 'edit', worker: w })}
                     aria-label="Редагувати"
                     title="Редагувати"
-                    className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                    className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                   >
                     <Pencil className="w-4 h-4" aria-hidden="true" />
                   </button>

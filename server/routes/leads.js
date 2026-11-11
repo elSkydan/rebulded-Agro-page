@@ -7,6 +7,7 @@
  * GET    /api/leads             — admin, paginated
  * GET    /api/leads/debug/stats — admin (registered before /:id)
  * GET    /api/leads/:id         — admin
+ * POST   /api/leads/:id/assign  — admin, manual worker assign
  * PATCH  /api/leads/:id/cancel  — admin, restricted statuses
  */
 
@@ -14,7 +15,7 @@ const express  = require('express');
 const router   = express.Router();
 const pool     = require('../../db/pool');
 const { calcPrice }                    = require('../services/pricingService');
-const { assignLead }                   = require('../services/assignmentService');
+const assignmentService = require('../services/assignmentService');
 const rateLimiter                      = require('../middlewares/rateLimiter');
 const { validateLead, normalizePhone } = require('../middlewares/validateLead');
 const auth                             = require('../middlewares/auth');
@@ -159,7 +160,7 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
   // ── Assign worker (awaited — response reflects real outcome) ──
   let assignmentResult;
   try {
-    assignmentResult = await assignLead(leadId, city_id);
+    assignmentResult = await assignmentService.assignLead(leadId, city_id);
   } catch (err) {
     console.error(`[POST /leads] assignLead failed for lead ${leadId}:`, err);
     // Lead is already persisted; return 201 but flag that assignment failed
@@ -330,6 +331,40 @@ router.get('/:id', auth, async (req, res) => {
   } catch (err) {
     console.error('[GET /leads/:id]', err);
     return res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/leads/:id/assign  (admin) — manual assign to a concrete worker
+// ---------------------------------------------------------------------------
+
+router.post('/:id/assign', auth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) {
+    return res.status(400).json({ error: 'Invalid lead id', code: 'INVALID_INPUT' });
+  }
+
+  const workerId = parseInt(req.body?.worker_id, 10);
+  if (!Number.isFinite(workerId) || workerId < 1) {
+    return res.status(400).json({
+      error: 'Body must include a positive integer worker_id',
+      code:  'INVALID_INPUT',
+    });
+  }
+
+  try {
+    const result = await assignmentService.assignLeadToWorker(id, workerId);
+    return res.json(result);
+  } catch (err) {
+    const status = err.statusCode ?? 500;
+    if (status >= 500) {
+      console.error(`[POST /leads/${id}/assign]`, err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    return res.status(status).json({
+      error: err.message,
+      code:  err.code ?? undefined,
+    });
   }
 });
 

@@ -20,6 +20,13 @@ export class AdminApiError extends Error {
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
+export interface AssignLeadResult {
+  lead_id: number;
+  status: 'assigned';
+  worker_id: number;
+  worker_name: string;
+}
+
 export interface AdminApi {
   listWorkers(): Promise<Worker[]>;
   createWorker(input: WorkerInput): Promise<Worker>;
@@ -28,6 +35,7 @@ export interface AdminApi {
   listCities(): Promise<City[]>;
   listLeads(query: LeadsQuery): Promise<LeadsPage>;
   cancelLead(id: number): Promise<void>;
+  assignLead(id: number, workerId: number): Promise<AssignLeadResult>;
   getStats(): Promise<LeadStats>;
 }
 
@@ -99,6 +107,8 @@ export function createAdminApi(
     cancelLead: async (id) => {
       await request<unknown>('PATCH', `/api/leads/${id}/cancel`);
     },
+    assignLead: (id, workerId) =>
+      request<AssignLeadResult>('POST', `/api/leads/${id}/assign`, { worker_id: workerId }),
     getStats: () => request<LeadStats>('GET', '/api/leads/debug/stats'),
   };
 }

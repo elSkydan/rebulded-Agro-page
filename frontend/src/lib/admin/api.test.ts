@@ -89,6 +89,17 @@ describe('createAdminApi', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/leads/debug/stats');
   });
 
+  it('assigns a lead with worker_id in the body', async () => {
+    const payload = { lead_id: 41, status: 'assigned' as const, worker_id: 2, worker_name: 'Іван' };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, payload));
+    const result = await createAdminApi('t', fetchMock).assignLead(41, 2);
+
+    expect(result).toEqual(payload);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/leads/41/assign');
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ worker_id: 2 });
+  });
+
   it('maps 401 to UNAUTHORIZED', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(401, { error: 'Unauthorized', code: 'INVALID_TOKEN' }));
     const err = await createAdminApi('bad', fetchMock).listWorkers().catch((e) => e);

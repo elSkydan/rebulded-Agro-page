@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { AdminApp } from './AdminApp';
 import { TOKEN_STORAGE_KEY } from '@/lib/admin/token-store';
-import { TOKEN, fakeBackend, makeLead } from './fakeBackend';
+import { TOKEN, fakeBackend, makeLead, makeWorker } from './fakeBackend';
 
 function leadRow(id: number) {
   return screen.getByRole('listitem', { name: `Заявка #${id}` });
@@ -120,6 +120,52 @@ describe('AdminApp — leads', () => {
     await screen.findByRole('heading', { name: 'Заявки (2)' });
     expect(within(leadRow(1)).queryByRole('button', { name: 'Скасувати' })).toBeNull();
     expect(within(leadRow(2)).queryByRole('button', { name: 'Скасувати' })).toBeNull();
+  });
+
+  it('assigns a lead to a worker and refreshes the summary', async () => {
+    const backend = fakeBackend({
+      leads: [makeLead({ status: 'unassigned' })],
+      workers: [
+        makeWorker({ id: 2, name: 'Петро', city_id: 2, city_name: 'Мерефа', is_active: true }),
+        makeWorker({ id: 1, name: 'Іван', city_id: 1, city_name: 'Харків', is_active: true }),
+        makeWorker({ id: 3, name: 'Олег', city_id: 1, city_name: 'Харків', is_active: false }),
+      ],
+      stats: { total_leads: 37, active_workers: 2, pending_leads: 2, unassigned_leads: 1, today_leads: 4 },
+    });
+    const user = userEvent.setup();
+    render(<AdminApp />);
+    await screen.findByRole('heading', { name: 'Заявки (1)' });
+    const statsCallsBefore = backend.gets('/api/leads/debug/stats').length;
+
+    await user.click(within(leadRow(41)).getByRole('button', { name: 'Призначити' }));
+    const select = await within(leadRow(41)).findByRole('combobox');
+    // Same-city active first: Іван before Петро; inactive Олег still listed but disabled.
+    expect(Array.from(select.querySelectorAll('option')).map((o) => o.textContent)).toEqual([
+      'Іван (Харків) · Мотоблок',
+      'Петро (Мерефа) · Мотоблок',
+      'Олег (Харків) · Мотоблок — неактивний',
+    ]);
+    expect((select as HTMLSelectElement).value).toBe('1');
+
+    await user.click(within(leadRow(41)).getByRole('button', { name: 'Призначити' }));
+
+    await waitFor(() => expect(within(leadRow(41)).getByText('Призначена')).toBeTruthy());
+    expect(within(leadRow(41)).getByText(/Іван/)).toBeTruthy();
+    expect(backend.mutating()).toEqual([
+      { method: 'POST', url: '/api/leads/41/assign', body: { worker_id: 1 } },
+    ]);
+    await waitFor(() => expect(backend.gets('/api/leads/debug/stats').length).toBe(statsCallsBefore + 1));
+    expect(within(tile('Без виконавця')).getByText('0')).toBeTruthy();
+  });
+
+  it('hides assign for accepted / completed leads', async () => {
+    fakeBackend({
+      leads: [makeLead({ id: 1, status: 'accepted' }), makeLead({ id: 2, status: 'completed' })],
+    });
+    render(<AdminApp />);
+    await screen.findByRole('heading', { name: 'Заявки (2)' });
+    expect(within(leadRow(1)).queryByRole('button', { name: 'Призначити' })).toBeNull();
+    expect(within(leadRow(2)).queryByRole('button', { name: 'Призначити' })).toBeNull();
   });
 
   it('loads more pages on demand', async () => {
