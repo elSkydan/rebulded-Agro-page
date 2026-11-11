@@ -102,7 +102,7 @@ describe('AdminApp — leads', () => {
     const user = userEvent.setup();
     render(<AdminApp />);
     await screen.findByRole('heading', { name: 'Заявки (1)' });
-    const statsCallsBefore = backend.gets('/api/leads/debug/stats').length;
+    const statsCallsBefore = backend.gets('/api/leads/stats').length;
 
     await user.click(within(leadRow(41)).getByRole('button', { name: 'Скасувати' }));
     expect(backend.mutating()).toEqual([]);
@@ -112,7 +112,7 @@ describe('AdminApp — leads', () => {
 
     await waitFor(() => expect(within(leadRow(41)).getByText('Скасована')).toBeTruthy());
     expect(backend.mutating()).toEqual([{ method: 'PATCH', url: '/api/leads/41/cancel', body: undefined }]);
-    await waitFor(() => expect(backend.gets('/api/leads/debug/stats').length).toBe(statsCallsBefore + 1));
+    await waitFor(() => expect(backend.gets('/api/leads/stats').length).toBe(statsCallsBefore + 1));
     expect(within(leadRow(41)).queryByRole('button', { name: 'Скасувати' })).toBeNull();
   });
 
@@ -150,7 +150,7 @@ describe('AdminApp — leads', () => {
     const user = userEvent.setup();
     render(<AdminApp />);
     await screen.findByRole('heading', { name: 'Заявки (1)' });
-    const statsCallsBefore = backend.gets('/api/leads/debug/stats').length;
+    const statsCallsBefore = backend.gets('/api/leads/stats').length;
 
     await user.click(within(leadRow(41)).getByRole('button', { name: 'Призначити' }));
     const select = await within(leadRow(41)).findByRole('combobox');
@@ -169,7 +169,7 @@ describe('AdminApp — leads', () => {
     expect(backend.mutating()).toEqual([
       { method: 'POST', url: '/api/leads/41/assign', body: { worker_id: 1 } },
     ]);
-    await waitFor(() => expect(backend.gets('/api/leads/debug/stats').length).toBe(statsCallsBefore + 1));
+    await waitFor(() => expect(backend.gets('/api/leads/stats').length).toBe(statsCallsBefore + 1));
     expect(within(tile('Без виконавця')).getByText('0')).toBeTruthy();
   });
 

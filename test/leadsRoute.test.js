@@ -92,12 +92,12 @@ describe('GET /api/leads', () => {
   });
 });
 
-describe('GET /api/leads/debug/stats', () => {
-  test('returns unassigned and today counts alongside the existing ones', async () => {
+describe('GET /api/leads/stats', () => {
+  test('returns unassigned and today counts from a single FILTER query', async () => {
     results = [
-      { rows: [{ total_leads: '37', active_workers: '3', pending_leads: '2', unassigned_leads: '1', today_leads: '4' }] },
+      { rows: [{ total_leads: 37, active_workers: 3, pending_leads: 2, unassigned_leads: 1, today_leads: 4 }] },
     ];
-    const res = await fetch(`${base}/debug/stats`, { headers: auth });
+    const res = await fetch(`${base}/stats`, { headers: auth });
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), {
       total_leads: 37,
@@ -106,8 +106,23 @@ describe('GET /api/leads/debug/stats', () => {
       unassigned_leads: 1,
       today_leads: 4,
     });
-    // 'Europe/Kiev' is understood by every tzdata version; 'Europe/Kyiv' only by 2022b+.
+    assert.match(queries[0].sql, /FILTER \(WHERE status = 'unassigned'\)/);
     assert.match(queries[0].sql, /Europe\/Kiev/);
+  });
+
+  test('debug/stats alias returns the same payload', async () => {
+    results = [
+      { rows: [{ total_leads: '3', active_workers: '1', pending_leads: '0', unassigned_leads: '3', today_leads: '3' }] },
+    ];
+    const res = await fetch(`${base}/debug/stats`, { headers: auth });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), {
+      total_leads: 3,
+      active_workers: 1,
+      pending_leads: 0,
+      unassigned_leads: 3,
+      today_leads: 3,
+    });
   });
 });
 
