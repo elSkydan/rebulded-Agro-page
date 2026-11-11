@@ -121,7 +121,7 @@ export const WORK_STEPS: WorkStep[] = [
   {
     icon: Calculator,
     title: 'Розрахунок',
-    description: "Обговорюємо обсяг та вартість робіт — безкоштовна консультація",
+    description: 'Обговорюємо обсяг та вартість робіт — безкоштовна консультація',
   },
   {
     icon: CalendarCheck,

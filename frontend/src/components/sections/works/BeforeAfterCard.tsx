@@ -44,10 +44,10 @@ export function BeforeAfterCard({ item }: BeforeAfterCardProps) {
           <button
             type="button"
             onClick={() => setShowAfter(false)}
-            className={`ba-btn flex-1 py-3 text-sm font-semibold ${
+            className={`ba-btn flex-1 py-3 text-sm font-semibold transition-colors ${
               !showAfter
-                ? 'text-red-500 bg-red-50'
-                : 'text-gray-400 hover:text-primary transition-colors'
+                ? 'text-primary bg-primary/10'
+                : 'text-gray-400 hover:text-primary'
             }`}
           >
             До
@@ -55,8 +55,10 @@ export function BeforeAfterCard({ item }: BeforeAfterCardProps) {
           <button
             type="button"
             onClick={() => setShowAfter(true)}
-            className={`ba-btn flex-1 py-3 text-sm font-semibold ${
-              showAfter ? 'text-primary' : 'text-gray-400 hover:text-primary transition-colors'
+            className={`ba-btn flex-1 py-3 text-sm font-semibold transition-colors ${
+              showAfter
+                ? 'text-primary bg-primary/10'
+                : 'text-gray-400 hover:text-primary'
             }`}
           >
             Після

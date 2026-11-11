@@ -5,6 +5,8 @@ import { Calculator as CalculatorIcon, ChevronDown, TriangleAlert } from 'lucide
 import {
   AREA_OPTIONAL_SERVICES,
   MAX_AREA_DISPLAY,
+  OUT_OF_CITY_RADIUS_KM,
+  OUT_OF_CITY_SURCHARGE_UAH,
   SERVICE_UI_NOTE,
   calcClientPreview,
   formatArea,
@@ -149,7 +151,10 @@ export function Calculator({
             />
             <div className="min-w-0">
               <label htmlFor="outskirts-cb" className="text-sm font-semibold text-gray-800 cursor-pointer">
-                За містом <span className="text-primary font-medium">(+800 грн)</span>
+                За містом{' '}
+                <span className="text-primary font-medium">
+                  (+{OUT_OF_CITY_SURCHARGE_UAH} грн, до {OUT_OF_CITY_RADIUS_KM} км)
+                </span>
               </label>
             </div>
           </div>
