@@ -25,8 +25,8 @@ const { respondLeadDbError }           = require('../utils/pgLeadError');
 // Statuses that mean the lead lifecycle is over — allow new lead from same phone
 const TERMINAL_STATUSES = ['completed', 'canceled', 'failed_contact'];
 
-// Statuses from which cancel is allowed
-const CANCELABLE_STATUSES = ['new', 'assigned', 'timeout'];
+// Statuses from which cancel is allowed (includes unassigned — stuck junk/duplicates)
+const CANCELABLE_STATUSES = ['new', 'assigned', 'timeout', 'unassigned'];
 
 // Mirrors lead_status_enum — validated before reaching PG (bad enum text would be a 500).
 const LEAD_STATUSES = [
@@ -234,8 +234,15 @@ router.get('/', auth, async (req, res) => {
               l.area, l.total_price, l.city_id, l.out_of_city, l.status,
               l.comment, l.created_at, l.updated_at,
               c.name AS city_name,
-              w.id   AS worker_id,
-              w.name AS worker_name
+              -- Only expose current assignee; stale worker_id on unassigned/new must not leak.
+              CASE
+                WHEN l.status IN ('unassigned', 'new', 'canceled') THEN NULL
+                ELSE w.id
+              END AS worker_id,
+              CASE
+                WHEN l.status IN ('unassigned', 'new', 'canceled') THEN NULL
+                ELSE w.name
+              END AS worker_name
        FROM   leads l
        LEFT JOIN cities  c ON c.id = l.city_id
        LEFT JOIN workers w ON w.id = l.worker_id
@@ -267,19 +274,25 @@ router.get('/debug/stats', auth, async (req, res) => {
       `SELECT
          (SELECT COUNT(*) FROM leads)                                    AS total_leads,
          (SELECT COUNT(*) FROM workers WHERE is_active = TRUE)          AS active_workers,
+         -- Waiting on a worker reply (sent / not yet accepted)
          (SELECT COUNT(*) FROM leads WHERE status IN ('new','assigned')) AS pending_leads,
+         -- No current worker — must match badge «Без виконавця» (status unassigned)
          (SELECT COUNT(*) FROM leads WHERE status = 'unassigned')       AS unassigned_leads,
          (SELECT COUNT(*) FROM leads
            WHERE created_at >= (date_trunc('day', NOW() AT TIME ZONE 'Europe/Kiev')
                                 AT TIME ZONE 'Europe/Kiev'))          AS today_leads`
     );
     const r = rows[0];
+    const n = (v) => {
+      const x = parseInt(v, 10);
+      return Number.isFinite(x) ? x : 0;
+    };
     res.json({
-      total_leads:    parseInt(r.total_leads, 10),
-      active_workers: parseInt(r.active_workers, 10),
-      pending_leads:  parseInt(r.pending_leads, 10),
-      unassigned_leads: parseInt(r.unassigned_leads, 10),
-      today_leads:    parseInt(r.today_leads, 10),
+      total_leads:      n(r.total_leads),
+      active_workers:   n(r.active_workers),
+      pending_leads:    n(r.pending_leads),
+      unassigned_leads: n(r.unassigned_leads),
+      today_leads:      n(r.today_leads),
     });
   } catch (err) {
     console.error('[GET /debug/stats]', err);

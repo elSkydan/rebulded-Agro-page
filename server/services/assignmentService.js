@@ -267,9 +267,13 @@ async function assignLead(leadId, cityId) {
       // Log WHY no worker was found before committing the transaction
       await logPickWorkerDiagnostics(client, leadId, cityId);
 
-      // STEP 6 (no worker path): update lead → unassigned
+      // STEP 6 (no worker path): update lead → unassigned (no current worker)
       await client.query(
-        `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
+        `UPDATE leads
+         SET    status     = 'unassigned',
+                worker_id  = NULL,
+                updated_at = NOW()
+         WHERE  id = $1`,
         [leadId]
       );
       // STEP 8: COMMIT
@@ -427,7 +431,11 @@ async function reassignLead(leadId, reason) {
       await logPickWorkerDiagnostics(client, leadId, lead.city_id);
 
       await client.query(
-        `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
+        `UPDATE leads
+         SET    status     = 'unassigned',
+                worker_id  = NULL,
+                updated_at = NOW()
+         WHERE  id = $1`,
         [leadId]
       );
       await client.query('COMMIT');
@@ -842,7 +850,11 @@ async function rejectLead(workerId, leadId) {
     let allRejected = false;
     if (pendingCount === 0 && acceptedCount === 0) {
       await client.query(
-        `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
+        `UPDATE leads
+         SET    status     = 'unassigned',
+                worker_id  = NULL,
+                updated_at = NOW()
+         WHERE  id = $1`,
         [leadId]
       );
       allRejected = true;

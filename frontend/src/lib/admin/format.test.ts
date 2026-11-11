@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatArea, formatKyivDateTime, formatMoney } from './format';
+import { leadWorkerLabel } from './types';
 
 describe('formatKyivDateTime', () => {
   it('renders in Europe/Kyiv regardless of the runtime zone', () => {
@@ -25,5 +26,18 @@ describe('formatArea', () => {
   it('drops a trailing .0 and uses a decimal comma', () => {
     expect(formatArea('6.0')).toBe('6 сот.');
     expect(formatArea('6.5')).toBe('6,5 сот.');
+  });
+});
+
+describe('leadWorkerLabel', () => {
+  it('hides stale workers on unassigned / new / canceled', () => {
+    expect(leadWorkerLabel({ status: 'unassigned', worker_name: 'Skydan' })).toBe('—');
+    expect(leadWorkerLabel({ status: 'new', worker_name: 'Skydan' })).toBe('—');
+    expect(leadWorkerLabel({ status: 'canceled', worker_name: 'Skydan' })).toBe('—');
+  });
+
+  it('shows the current worker on assigned / accepted', () => {
+    expect(leadWorkerLabel({ status: 'assigned', worker_name: 'Іван' })).toBe('Іван');
+    expect(leadWorkerLabel({ status: 'accepted', worker_name: null })).toBe('—');
   });
 });

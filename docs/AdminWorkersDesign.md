@@ -189,8 +189,10 @@ Telegram side needs no change: a worker pressing a button on a canceled lead alr
                          [Показати ще]
 ```
 
-- Cancel only for `new | assigned | timeout` (mirrors backend); inline confirm «Скасувати заявку #41?» [Так] [Ні].
+- Cancel only for `new | assigned | timeout | unassigned` (mirrors backend); inline confirm «Скасувати заявку #41?» [Так] [Ні].
 - After cancel: row badge → «Скасована», summary refetched.
+- Status `unassigned` always clears `worker_id`; list/API hide worker for `unassigned|new|canceled` so the row never shows «Без виконавця» + a name.
+- Summary tiles show `0` (not «—») once stats have loaded; «Без виконавця» = `COUNT(status = unassigned)`.
 - Page size 50, «Показати ще» appends (offset), hidden when all loaded.
 - Dates in Europe/Kyiv regardless of the browser zone; money formatted `1 800 грн`.
 

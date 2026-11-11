@@ -113,7 +113,11 @@ async function distributeLead(leadId) {
 
   if (!workers.length) {
     await pool.query(
-      `UPDATE leads SET status = 'unassigned', updated_at = NOW() WHERE id = $1`,
+      `UPDATE leads
+       SET    status     = 'unassigned',
+              worker_id  = NULL,
+              updated_at = NOW()
+       WHERE  id = $1`,
       [leadId]
     );
     log('lead_unassigned', leadId, { reason: 'no_workers' });

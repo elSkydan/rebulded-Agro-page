@@ -84,9 +84,10 @@ describe('GET /api/leads', () => {
     assert.deepEqual(await res.json(), { total: 1, limit: 20, offset: 40, data: [{ id: 41 }] });
 
     const listSql = queries[1].sql;
-    for (const col of ['c.name AS city_name', 'l.out_of_city', 'l.comment', 'l.phone_raw', 'w.name AS worker_name']) {
+    for (const col of ['c.name AS city_name', 'l.out_of_city', 'l.comment', 'l.phone_raw']) {
       assert.ok(listSql.includes(col), `list should select ${col}`);
     }
+    assert.match(listSql, /WHEN l\.status IN \('unassigned', 'new', 'canceled'\) THEN NULL/i);
     assert.deepEqual(queries[1].params, ['unassigned', 20, 40]);
   });
 });

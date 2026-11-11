@@ -212,3 +212,6 @@ ALTER TABLE leads
 -- Raise global min-order floor (existing DBs keep the old inline CHECK name)
 ALTER TABLE leads DROP CONSTRAINT IF EXISTS leads_total_price_check;
 ALTER TABLE leads ADD CONSTRAINT leads_total_price_check CHECK (total_price >= 1500);
+
+-- Integrity: «unassigned» / «new» means no current worker (stale worker_id confused admin UI).
+UPDATE leads SET worker_id = NULL WHERE status IN ('unassigned', 'new') AND worker_id IS NOT NULL;

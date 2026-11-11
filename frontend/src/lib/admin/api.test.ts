@@ -82,11 +82,19 @@ describe('createAdminApi', () => {
     const api = createAdminApi('t', fetchMock);
 
     await api.cancelLead(5);
-    await api.getStats();
+    const stats = await api.getStats();
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/leads/5/cancel');
     expect(fetchMock.mock.calls[0][1].method).toBe('PATCH');
     expect(fetchMock.mock.calls[1][0]).toBe('/api/leads/debug/stats');
+    // Missing keys become 0 so the summary never shows "—" for a loaded payload.
+    expect(stats).toEqual({
+      total_leads: 1,
+      active_workers: 0,
+      pending_leads: 0,
+      unassigned_leads: 0,
+      today_leads: 0,
+    });
   });
 
   it('assigns a lead with worker_id in the body', async () => {
