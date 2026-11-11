@@ -33,10 +33,10 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-gray-800 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="mt-8 pt-6 border-t border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-2 gap-x-8">
           <nav
             aria-label="Юридична інформація"
-            className="flex flex-wrap gap-x-4 gap-y-1"
+            className="flex flex-wrap items-center gap-x-4 gap-y-1"
           >
             {FOOTER_LINKS.map((link) => (
               <SiteNavLink
@@ -51,7 +51,7 @@ export function Footer() {
 
           <nav
             aria-label="Карта сайту"
-            className="flex flex-wrap gap-x-4 gap-y-1 sm:justify-end sm:max-w-xl"
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:justify-end"
           >
             <Link href="/" className={navLinkClass}>
               Головна
