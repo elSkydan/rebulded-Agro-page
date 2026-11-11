@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Images, MapPinned, Wallet, Wrench } from 'lucide-react';
+import { ArrowRight, Images, MapPinned, MessageSquareQuote, Wallet, Wrench } from 'lucide-react';
 
 const TILES = [
   {
@@ -26,6 +26,12 @@ const TILES = [
     description: 'Калькулятор вартості та заявка онлайн',
     href: '/pricing',
   },
+  {
+    icon: MessageSquareQuote,
+    title: 'Відгуки',
+    description: 'Досвід клієнтів і посилання на Google',
+    href: '/reviews',
+  },
 ];
 
 /** Compact hub links shown on the home page — full content lives on each dedicated page. */
@@ -39,7 +45,7 @@ export function ExploreMore() {
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Дізнайтеся більше</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {TILES.map((tile) => (
             <Link
               key={tile.href}

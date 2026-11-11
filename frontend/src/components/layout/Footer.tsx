@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { siteConfig } from '@/lib/config';
-import { NAV_LINKS } from '@/lib/content';
+import { FOOTER_LINKS, NAV_LINKS } from '@/lib/content';
 import { SiteNavLink } from '@/components/layout/SiteNavLink';
 import logoIcon from '@/assets/logo-icon.png';
 
@@ -48,8 +48,36 @@ export function Footer() {
           ))}
         </nav>
 
-        <div className="border-t border-gray-800 mt-6 pt-6 text-center text-gray-600 text-xs">
-          © {new Date().getFullYear()} {siteConfig.name}. Усі права захищені.
+        <nav
+          aria-label="Юридична інформація"
+          className="flex flex-wrap gap-x-4 gap-y-1 mt-2"
+        >
+          {FOOTER_LINKS.map((link) => (
+            <SiteNavLink
+              key={link.href}
+              href={link.href}
+              className="inline-flex items-center min-h-11 px-2 text-gray-500 hover:text-white text-sm transition-colors"
+            >
+              {link.label}
+            </SiteNavLink>
+          ))}
+        </nav>
+
+        <div className="border-t border-gray-800 mt-6 pt-6 text-gray-500 text-xs space-y-2">
+          <p>
+            {siteConfig.legal.entityName}
+            {' · '}
+            ЄДРПОУ/РНОКПП: {siteConfig.legal.edrpou}
+          </p>
+          <p>{siteConfig.legal.address}</p>
+          <p>
+            <a href={`mailto:${siteConfig.email}`} className="hover:text-gray-300 transition-colors">
+              {siteConfig.email}
+            </a>
+          </p>
+          <p className="text-gray-600 pt-2">
+            © {new Date().getFullYear()} {siteConfig.name}. Усі права захищені.
+          </p>
         </div>
       </div>
     </footer>

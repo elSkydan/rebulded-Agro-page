@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { Check, CheckCircle, ChevronDown, Send } from 'lucide-react';
 import { ApiError, createLead, fetchPublicCities, type PublicCity } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
@@ -355,6 +356,13 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
               <a href={`tel:${siteConfig.phone}`} className="text-primary font-medium hover:underline">
                 {siteConfig.phoneDisplay}
               </a>
+            </p>
+            <p className="text-center text-gray-400 text-xs mt-1.5">
+              Надсилаючи заявку, ви погоджуєтесь з{' '}
+              <Link href="/privacy" className="text-primary font-medium hover:underline">
+                політикою конфіденційності
+              </Link>
+              .
             </p>
           </form>
         )}

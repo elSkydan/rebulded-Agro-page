@@ -43,6 +43,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'yearly',
       priority: 0.5,
     },
+    {
+      url: `${siteConfig.url}/reviews`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    },
+    {
+      url: `${siteConfig.url}/contractors`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.55,
+    },
+    {
+      url: `${siteConfig.url}/privacy`,
+      lastModified,
+      changeFrequency: 'yearly',
+      priority: 0.3,
+    },
   ];
 
   const servicePages: MetadataRoute.Sitemap = SERVICE_LANDINGS.map((service) => ({
