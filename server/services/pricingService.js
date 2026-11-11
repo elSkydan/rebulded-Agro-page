@@ -8,10 +8,12 @@
 
 const MIN_AREA_GLOBAL = 0.5;
 const MAX_AREA        = 50;
-const MIN_ORDER       = 1000;
+const MIN_ORDER       = 1500;
 
 /** Fixed surcharge when lead is outside city (UAH). */
 const OUT_OF_CITY_SURCHARGE_UAH = 800;
+/** Out-of-city surcharge applies within this radius (km). */
+const OUT_OF_CITY_RADIUS_KM = 150;
 
 const SERVICE_MIN_AREA = {
   ogorod: 5,
@@ -143,5 +145,7 @@ module.exports = {
   effectiveAreaForService,
   minimumBillForService,
   MAX_AREA,
+  MIN_ORDER,
   OUT_OF_CITY_SURCHARGE_UAH,
+  OUT_OF_CITY_RADIUS_KM,
 };

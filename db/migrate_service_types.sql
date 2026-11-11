@@ -1,6 +1,11 @@
--- Run once on existing DBs (PostgreSQL 14+). Fails if values already exist — that is OK.
--- New installs: use schema.sql (enum already lists all service types).
+-- ============================================================
+--  DEPRECATED — kept for manual upgrades of pre-v2 databases.
+--  Prefer: npm run db:migrate  (applies db/schema.sql)
+--
+--  Everything below is already included in schema.sql.
+--  Safe to re-run (idempotent) — IF NOT EXISTS (PostgreSQL 9.1+ / 14+).
+-- ============================================================
 
-ALTER TYPE service_type_enum ADD VALUE 'mowing';
-ALTER TYPE service_type_enum ADD VALUE 'tree';
-ALTER TYPE service_type_enum ADD VALUE 'washing';
+ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'mowing';
+ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'tree';
+ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'washing';

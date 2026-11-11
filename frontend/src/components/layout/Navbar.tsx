@@ -37,7 +37,7 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center flex-shrink-0" aria-label={siteConfig.name}>
-            <Image src={logoIcon} alt="" priority className="h-8 w-8 sm:hidden" />
+            <Image src={logoIcon} alt={siteConfig.name} priority className="h-8 w-8 sm:hidden" />
             <Image src={logoNavbar} alt={siteConfig.name} priority className="hidden sm:block h-9 w-auto" />
           </Link>
 

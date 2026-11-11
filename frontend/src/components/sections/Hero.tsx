@@ -3,15 +3,21 @@ import Link from 'next/link';
 import { ChevronDown, MapPin, Phone } from 'lucide-react';
 import { HERO_CARDS } from '@/lib/content';
 import { siteConfig } from '@/lib/config';
+import {
+  MIN_ORDER_UAH,
+  OUT_OF_CITY_RADIUS_KM,
+  OUT_OF_CITY_SURCHARGE_UAH,
+} from '@/lib/pricing';
+import pokosAfter from '@/assets/works/pokos-after.jpg';
 
 export function Hero() {
   return (
     <section id="hero" className="relative min-h-screen flex items-center overflow-hidden">
-      {/* Background */}
+      {/* Background — real works photo (покос) */}
       <div className="hero-bg absolute inset-0">
         <Image
-          src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1800&q=85"
-          alt="Агророботи мотоблоком у Харкові — вспашка та підготовка ділянки"
+          src={pokosAfter}
+          alt="Покос трави мотоблоком у Харкові — результат роботи"
           fill
           priority
           fetchPriority="high"
@@ -42,23 +48,8 @@ export function Hero() {
           Приїдемо вже сьогодні. Працюємо по Харкову та області.
         </p>
 
-        {/* Info Cards */}
-        <div className="grid grid-cols-2 gap-3 mb-8 max-w-lg">
-          {HERO_CARDS.map((card) => (
-            <div key={card.label} className="hero-card flex items-center gap-3 p-3 rounded-xl">
-              <div className="w-8 h-8 bg-primary/80 rounded-lg flex items-center justify-center flex-shrink-0">
-                <card.icon className="w-4 h-4 text-white" aria-hidden="true" />
-              </div>
-              <div>
-                <p className="text-white/60 text-xs">{card.label}</p>
-                <p className="text-white text-sm font-semibold">{card.value}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        {/* CTA above cards so mobile first screen shows actions */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <a
             href={`tel:${siteConfig.phone}`}
             className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-primary/30 hover:shadow-xl"
@@ -72,6 +63,26 @@ export function Hero() {
           >
             Розрахувати ціну
           </Link>
+        </div>
+
+        <p className="text-white/70 text-sm mb-8 max-w-lg">
+          Мін. замовлення від {MIN_ORDER_UAH} грн · Виїзд за місто +{OUT_OF_CITY_SURCHARGE_UAH}{' '}
+          грн (до {OUT_OF_CITY_RADIUS_KM} км)
+        </p>
+
+        {/* Info Cards */}
+        <div className="grid grid-cols-2 gap-3 max-w-lg">
+          {HERO_CARDS.map((card) => (
+            <div key={card.label} className="hero-card flex items-center gap-3 p-3 rounded-xl">
+              <div className="w-8 h-8 bg-primary/80 rounded-lg flex items-center justify-center flex-shrink-0">
+                <card.icon className="w-4 h-4 text-white" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-white/60 text-xs">{card.label}</p>
+                <p className="text-white text-sm font-semibold">{card.value}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
