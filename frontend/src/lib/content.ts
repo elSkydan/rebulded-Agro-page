@@ -3,19 +3,14 @@ import {
   BadgeCheck,
   CalendarCheck,
   Calculator,
-  Drill,
-  Droplets,
   Navigation,
   PhoneCall,
   Settings,
-  Shovel,
-  Tractor,
   Truck,
-  Wind,
   Zap,
 } from 'lucide-react';
 import type { StaticImageData } from 'next/image';
-import type { ServiceType } from './pricing';
+import { SERVICE_CATALOG } from './services-catalog';
 import celinaBefore from '@/assets/works/celina-before.jpg';
 import celinaAfter from '@/assets/works/celina-after.jpg';
 import pokosBefore from '@/assets/works/pokos-before.jpg';
@@ -23,13 +18,7 @@ import pokosAfter from '@/assets/works/pokos-after.jpg';
 
 /** Options shared by the calculator select and the lead-form select.
  *  Keep labels short — long option text overflows native selects on mobile. */
-export const SERVICE_OPTIONS: { value: ServiceType; label: string }[] = [
-  { value: 'ogorod', label: 'Огород / вспашка' },
-  { value: 'celina', label: 'Цілина' },
-  { value: 'mowing', label: 'Покос трави' },
-  { value: 'tree', label: 'Демонтаж дерева' },
-  { value: 'washing', label: 'Мийка техніки' },
-];
+export { SERVICE_OPTIONS } from './services-catalog';
 
 /** Names that identify the currently active service region (Kharkiv). */
 export const ACTIVE_REGION_NAMES = ['харків', 'харьков', 'kharkiv', 'kharkov'] as const;
@@ -49,49 +38,14 @@ export interface ServiceCard {
   badge?: string;
 }
 
-export const SERVICE_CARDS: ServiceCard[] = [
-  {
-    icon: Tractor,
-    title: 'Вспашка і культивація',
-    description:
-      'Обробка огородів та присадибних ділянок потужним дизельним мотоблоком. Ширина захвату фрези 1 м, глибина культивації до 18 см, вспашки до 25–30 см.',
-    price: 'від 300 грн',
-    slug: 'vspashka',
-    badge: 'Популярно',
-  },
-  {
-    icon: Shovel,
-    title: 'Обробка целини',
-    description:
-      'Обробка целини можлива будь-якої пори, навіть взимку за плюсової температури. Перетворимо запущену ділянку на готовий ґрунт під посадку.',
-    price: 'від 600 грн',
-    slug: 'tsilyna',
-  },
-  {
-    icon: Wind,
-    title: 'Покос трави',
-    description:
-      'Покос трави фрезами. Швидко та якісно обробимо ділянки від 10 соток — орієнтовно за ставкою калькулятора.',
-    price: 'від 200 грн/сот.',
-    slug: 'pokos',
-  },
-  {
-    icon: Drill,
-    title: 'Буріння лунок',
-    description:
-      'Буріння лунок мотобуром діаметром до 250 мм. Ідеально для встановлення паль, посадки дерев та будь-яких інших потреб.',
-    price: 'від 100 грн/лунку',
-    slug: 'burinnya',
-  },
-  {
-    icon: Droplets,
-    title: 'Мийка техніки',
-    description:
-      'Мийка техніки та обладнання мобільною дизельною мийкою високого тиску 200 бар. Якісна чистка прямо у вас на ділянці.',
-    price: 'від 250 грн',
-    slug: 'myjka',
-  },
-];
+export const SERVICE_CARDS: ServiceCard[] = SERVICE_CATALOG.map((s) => ({
+  icon: s.icon,
+  title: s.cardTitle,
+  description: s.cardDescription,
+  price: s.cardPrice,
+  slug: s.slug,
+  badge: s.cardBadge,
+}));
 
 export interface HeroCard {
   icon: LucideIcon;

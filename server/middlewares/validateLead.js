@@ -2,7 +2,7 @@
 
 const { effectiveAreaForService } = require('../services/pricingService');
 
-const VALID_SERVICE_TYPES = ['ogorod', 'celina', 'mowing', 'tree', 'washing'];
+const VALID_SERVICE_TYPES = ['ogorod', 'celina', 'mowing', 'tree', 'washing', 'drilling'];
 
 function normalizePhone(raw) {
   if (!raw || typeof raw !== 'string') {

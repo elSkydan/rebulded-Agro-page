@@ -3,7 +3,7 @@
 /**
  * pricingService.js
  * Server is the ONLY source of truth for pricing.
- * The client calc.js may mirror this for UX preview only.
+ * The client pricing.ts may mirror this for UX preview only.
  */
 
 const MIN_AREA_GLOBAL = 0.5;
@@ -21,6 +21,7 @@ const SERVICE_MIN_AREA = {
   mowing: 10,
   tree: 1,
   washing: 1,
+  drilling: 1,
 };
 
 /** Огород: 300 UAH per 0.5 sot. step (per full sotka), min 5 sot. */
@@ -32,8 +33,9 @@ const CELINA_MIN            = 1800;
 const MOWING_RATE_PER_SOTKA = 200;
 const MOWING_MIN            = 200;
 
-const TREE_MIN    = 500;
-const WASHING_MIN = 250;
+const TREE_MIN     = 500;
+const WASHING_MIN  = 250;
+const DRILLING_MIN = 100;
 
 /**
  * Round area UP to the nearest 0.5 sotka.
@@ -58,27 +60,35 @@ function effectiveAreaForService(serviceType, rawArea) {
   return Math.max(capped, minAreaForService(serviceType));
 }
 
+function baseServicePrice(serviceType, area) {
+  if (serviceType === 'ogorod') {
+    return area * OGOROD_RATE_PER_SOTKA;
+  }
+  if (serviceType === 'celina') {
+    return Math.max(area * CELINA_RATE_PER_SOTKA, CELINA_MIN);
+  }
+  if (serviceType === 'mowing') {
+    return Math.max(area * MOWING_RATE_PER_SOTKA, MOWING_MIN);
+  }
+  if (serviceType === 'tree') {
+    return TREE_MIN;
+  }
+  if (serviceType === 'washing') {
+    return WASHING_MIN;
+  }
+  if (serviceType === 'drilling') {
+    return DRILLING_MIN;
+  }
+  return null;
+}
+
 /** Lowest legal total (UAH, after MIN_ORDER) for this service at min area + optional виїзд. */
 function minimumBillForService(serviceType, outOfCity) {
   const a = minAreaForService(serviceType);
-  let price;
+  const base = baseServicePrice(serviceType, a);
+  if (base == null) return NaN;
 
-  if (serviceType === 'ogorod') {
-    price = a * OGOROD_RATE_PER_SOTKA;
-  } else if (serviceType === 'celina') {
-    price = a * CELINA_RATE_PER_SOTKA;
-    price = Math.max(price, CELINA_MIN);
-  } else if (serviceType === 'mowing') {
-    price = a * MOWING_RATE_PER_SOTKA;
-    price = Math.max(price, MOWING_MIN);
-  } else if (serviceType === 'tree') {
-    price = TREE_MIN;
-  } else if (serviceType === 'washing') {
-    price = WASHING_MIN;
-  } else {
-    return NaN;
-  }
-
+  let price = base;
   if (outOfCity) price += OUT_OF_CITY_SURCHARGE_UAH;
   return Math.round(Math.max(price, MIN_ORDER));
 }
@@ -86,7 +96,7 @@ function minimumBillForService(serviceType, outOfCity) {
 /**
  * Calculate total price for a lead.
  *
- * @param {'ogorod'|'celina'|'mowing'|'tree'|'washing'} serviceType
+ * @param {'ogorod'|'celina'|'mowing'|'tree'|'washing'|'drilling'} serviceType
  * @param {number} rawArea           - sotki, before rounding
  * @param {boolean} outOfCity
  * @param {*} [_city]                  Unused; API compatibility (out-of-city fee is fixed).
@@ -103,32 +113,15 @@ function calcPrice(serviceType, rawArea, outOfCity, _city) {
     );
   }
 
-  let price;
-
-  if (serviceType === 'ogorod') {
-    price = area * OGOROD_RATE_PER_SOTKA;
-
-  } else if (serviceType === 'celina') {
-    price = area * CELINA_RATE_PER_SOTKA;
-    price = Math.max(price, CELINA_MIN);
-
-  } else if (serviceType === 'mowing') {
-    price = area * MOWING_RATE_PER_SOTKA;
-    price = Math.max(price, MOWING_MIN);
-
-  } else if (serviceType === 'tree') {
-    price = TREE_MIN;
-
-  } else if (serviceType === 'washing') {
-    price = WASHING_MIN;
-
-  } else {
+  const base = baseServicePrice(serviceType, area);
+  if (base == null) {
     throw Object.assign(
       new Error(`Unknown serviceType: "${serviceType}".`),
       { code: 'INVALID_SERVICE_TYPE', statusCode: 422 }
     );
   }
 
+  let price = base;
   if (outOfCity) {
     price += OUT_OF_CITY_SURCHARGE_UAH;
   }

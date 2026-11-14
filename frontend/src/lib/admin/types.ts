@@ -100,7 +100,7 @@ export const ASSIGNABLE_LEAD_STATUSES: ReadonlySet<LeadStatus> = new Set([
   'rejected',
 ]);
 
-export type LeadServiceType = 'ogorod' | 'celina' | 'mowing' | 'tree' | 'washing';
+export type LeadServiceType = 'ogorod' | 'celina' | 'mowing' | 'tree' | 'washing' | 'drilling';
 
 export const SERVICE_TYPE_LABELS: Record<LeadServiceType, string> = {
   ogorod: 'Огород / вспашка',
@@ -108,6 +108,7 @@ export const SERVICE_TYPE_LABELS: Record<LeadServiceType, string> = {
   mowing: 'Покос трави',
   tree: 'Демонтаж дерева',
   washing: 'Мийка техніки',
+  drilling: 'Буріння лунок',
 };
 
 export interface Lead {

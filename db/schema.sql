@@ -31,7 +31,7 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE service_type_enum AS ENUM ('ogorod', 'celina', 'mowing', 'tree', 'washing');
+  CREATE TYPE service_type_enum AS ENUM ('ogorod', 'celina', 'mowing', 'tree', 'washing', 'drilling');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -39,6 +39,7 @@ END $$;
 ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'mowing';
 ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'tree';
 ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'washing';
+ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'drilling';
 
 DO $$ BEGIN
   CREATE TYPE lead_status_enum AS ENUM (

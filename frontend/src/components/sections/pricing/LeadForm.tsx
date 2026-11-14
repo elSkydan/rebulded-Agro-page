@@ -10,12 +10,14 @@ import { SERVICE_OPTIONS, isActiveRegion } from '@/lib/content';
 import { clearPendingLead, readPendingLead } from '@/lib/leadQueue';
 import { formatPhone, isValidPhone } from '@/lib/phone';
 import {
-  AREA_OPTIONAL_SERVICES,
+  AREA_HIDDEN_SERVICES,
   MAX_AREA_DISPLAY,
   calcClientPreview,
   formatArea,
   minAreaForService,
+  parseAreaInput,
   roundArea,
+  serviceLabel,
   type ServiceType,
 } from '@/lib/pricing';
 
@@ -34,10 +36,6 @@ function pickDefaultCityId(cities: PublicCity[]): number {
   const configured = cities.find((c) => c.id === siteConfig.defaultCityId);
   if (configured) return configured.id;
   return cities[0]?.id ?? siteConfig.defaultCityId;
-}
-
-function serviceLabel(service: ServiceType): string {
-  return SERVICE_OPTIONS.find((opt) => opt.value === service)?.label ?? service;
 }
 
 interface LeadFormProps {
@@ -124,13 +122,14 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
   /** Effective area valid for the selected service (backend expects 0.5–50). */
   function effectiveArea(): number {
     const minA = minAreaForService(service);
-    const rounded = roundArea(areaInput);
+    if (AREA_HIDDEN_SERVICES.has(service)) return minA;
+    const rounded = roundArea(parseAreaInput(areaInput));
     if (!Number.isFinite(rounded)) return minA;
     return Math.min(Math.max(rounded, minA), MAX_AREA_DISPLAY);
   }
 
   const preview = calcClientPreview(service, areaInput, outOfCity);
-  const showAreaInSummary = !AREA_OPTIONAL_SERVICES.has(service);
+  const showAreaInSummary = !AREA_HIDDEN_SERVICES.has(service);
   const estimateSummary = preview.ok
     ? [
         serviceLabel(service),
