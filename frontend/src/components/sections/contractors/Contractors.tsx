@@ -12,7 +12,7 @@ export function Contractors() {
             Виконавцям
           </span>
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
-            Стати виконавцем у {siteConfig.region}у
+            Стати виконавцем у {siteConfig.regionLocative}
           </h1>
           <p className="text-gray-500 text-base sm:text-lg">
             Отримуйте заявки на вспашку, целину та покос у Telegram. Без передплати від клієнта —
