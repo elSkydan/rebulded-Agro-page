@@ -125,8 +125,14 @@ export function fakeBackend(opts: Options = {}) {
       if (!lead) return json(404, { error: 'Lead not found' });
       if (!ASSIGNABLE.has(lead.status)) return json(400, { error: 'Cannot assign', code: 'INVALID_TRANSITION' });
       const worker = workers.find((w) => w.id === Number(body?.worker_id));
-      if (!worker) return json(404, { error: 'Worker not found' });
+      if (!worker) return json(404, { error: 'Worker not found', code: 'NOT_FOUND' });
       if (!worker.is_active) return json(400, { error: 'Worker is inactive', code: 'INVALID_WORKER' });
+      if (lead.status === 'assigned' && lead.worker_id === worker.id) {
+        return json(400, {
+          error: 'Lead is already assigned to this worker',
+          code: 'ALREADY_ASSIGNED',
+        });
+      }
       const wasUnassigned = lead.status === 'unassigned';
       lead.status = 'assigned';
       lead.worker_id = worker.id;
