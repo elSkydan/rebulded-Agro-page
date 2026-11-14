@@ -26,6 +26,27 @@ export const LEADS_PAGE_SIZE = 50;
 
 type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready' };
 
+/** Map backend assign error codes to short Ukrainian copy for the inline picker. */
+export function assignLeadErrorMessage(err: unknown, fallback: string): string {
+  if (!(err instanceof AdminApiError)) return fallback;
+  switch (err.code) {
+    case 'ALREADY_ASSIGNED':
+      return 'Ця заявка вже призначена цьому виконавцю';
+    case 'INVALID_WORKER':
+      return 'Цей виконавець недоступний для призначення';
+    case 'INVALID_TRANSITION':
+      return 'Заявку в цьому статусі не можна призначити';
+    case 'NOT_FOUND':
+      return 'Заявку або виконавця не знайдено';
+    case 'CONFLICT':
+      return 'Статус заявки щойно змінився — оновіть список і спробуйте знову';
+    case 'UNAUTHORIZED':
+      return err.message;
+    default:
+      return err.message && !/^[A-Za-z]/.test(err.message) ? err.message : fallback;
+  }
+}
+
 const STATUS_BADGE: Record<LeadStatus, string> = {
   unassigned: 'bg-red-100 text-red-800',
   new: 'bg-amber-100 text-amber-800',
@@ -62,6 +83,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
   const [assigningId, setAssigningId] = useState<number | null>(null);
   const [workers, setWorkers] = useState<Worker[] | null>(null);
   const [workersError, setWorkersError] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   /** Guards against an older (slower) response overwriting a newer filter's results. */
   const requestSeq = useRef(0);
@@ -115,12 +137,14 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
     setStatusFilter(next);
     setConfirmId(null);
     setAssignId(null);
+    setAssignError(null);
     setLoad({ status: 'loading' });
     void fetchFirstPage(next);
   }
 
   function refresh() {
     setBanner(null);
+    setAssignError(null);
     setConfirmId(null);
     setAssignId(null);
     setLoad({ status: 'loading' });
@@ -167,6 +191,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
 
   async function openAssign(id: number) {
     setBanner(null);
+    setAssignError(null);
     setConfirmId(null);
     setAssignId(id);
     await ensureWorkers();
@@ -191,6 +216,7 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
 
   async function assignLead(id: number, workerId: number) {
     setBanner(null);
+    setAssignError(null);
     setAssigningId(id);
     try {
       const result = await api.assignLead(id, workerId);
@@ -202,10 +228,14 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
         ),
       );
       setAssignId(null);
+      setAssignError(null);
       void fetchStats();
     } catch (err) {
-      const message = handleError(err, 'Не вдалося призначити виконавця');
-      if (message) setBanner(message);
+      if (err instanceof AdminApiError && err.code === 'UNAUTHORIZED') {
+        onUnauthorized();
+        return;
+      }
+      setAssignError(assignLeadErrorMessage(err, 'Не вдалося призначити виконавця'));
     } finally {
       setAssigningId(null);
     }
@@ -283,15 +313,20 @@ export function LeadsPanel({ token, onUnauthorized }: Props) {
                   assignOpen={assignId === lead.id}
                   workers={workers}
                   workersError={assignId === lead.id ? workersError : null}
+                  assignError={assignId === lead.id ? assignError : null}
                   onAskCancel={() => {
                     setAssignId(null);
+                    setAssignError(null);
                     setConfirmId(lead.id);
                   }}
                   onConfirmCancel={() => cancelLead(lead.id)}
                   onDeclineCancel={() => setConfirmId(null)}
                   onAskAssign={() => void openAssign(lead.id)}
                   onConfirmAssign={(workerId) => void assignLead(lead.id, workerId)}
-                  onDeclineAssign={() => setAssignId(null)}
+                  onDeclineAssign={() => {
+                    setAssignId(null);
+                    setAssignError(null);
+                  }}
                 />
               ))}
             </ul>
@@ -349,12 +384,20 @@ interface LeadRowProps {
   assignOpen: boolean;
   workers: Worker[] | null;
   workersError: string | null;
+  assignError: string | null;
   onAskCancel: () => void;
   onConfirmCancel: () => void;
   onDeclineCancel: () => void;
   onAskAssign: () => void;
   onConfirmAssign: (workerId: number) => void;
   onDeclineAssign: () => void;
+}
+
+/** Drop the worker who already holds an assigned lead — that choice can only 400. */
+export function workersForAssignPicker(workers: Worker[], lead: Lead): Worker[] {
+  const sorted = sortWorkersForLead(workers, lead.city_id);
+  if (lead.status !== 'assigned' || lead.worker_id == null) return sorted;
+  return sorted.filter((w) => w.id !== lead.worker_id);
 }
 
 function LeadRow({
@@ -365,6 +408,7 @@ function LeadRow({
   assignOpen,
   workers,
   workersError,
+  assignError,
   onAskCancel,
   onConfirmCancel,
   onDeclineCancel,
@@ -375,8 +419,8 @@ function LeadRow({
   const cancelable = CANCELABLE_LEAD_STATUSES.has(lead.status);
   const assignable = ASSIGNABLE_LEAD_STATUSES.has(lead.status);
   const sorted = useMemo(
-    () => (workers ? sortWorkersForLead(workers, lead.city_id) : []),
-    [workers, lead.city_id],
+    () => (workers ? workersForAssignPicker(workers, lead) : []),
+    [workers, lead.city_id, lead.status, lead.worker_id],
   );
   const defaultWorkerId = sorted.find((w) => w.is_active)?.id ?? '';
   const [selectedWorkerId, setSelectedWorkerId] = useState<number | ''>(defaultWorkerId);
@@ -436,7 +480,7 @@ function LeadRow({
               ) : workers === null ? (
                 <p className="text-sm text-gray-500 mb-2">Завантаження виконавців…</p>
               ) : sorted.length === 0 ? (
-                <p className="text-sm text-gray-500 mb-2">Немає виконавців</p>
+                <p className="text-sm text-gray-500 mb-2">Немає інших активних виконавців</p>
               ) : (
                 <label className="block mb-3">
                   <span className="sr-only">Виконавець</span>
@@ -455,6 +499,11 @@ function LeadRow({
                   </select>
                 </label>
               )}
+              {assignError ? (
+                <p role="alert" className="text-sm text-red-700 mb-2">
+                  {assignError}
+                </p>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -470,7 +519,7 @@ function LeadRow({
                   disabled={assigning}
                   className="min-h-11 px-4 rounded-xl font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-60"
                 >
-                  Скасувати
+                  Закрити
                 </button>
               </div>
             </div>

@@ -183,6 +183,73 @@ describe('AdminApp — leads', () => {
     expect(within(leadRow(2)).queryByRole('button', { name: 'Призначити' })).toBeNull();
   });
 
+  it('hides the current assignee in the picker and labels dismiss as Закрити', async () => {
+    fakeBackend({
+      leads: [
+        makeLead({
+          status: 'assigned',
+          worker_id: 1,
+          worker_name: 'Іван',
+        }),
+      ],
+      workers: [
+        makeWorker({ id: 1, name: 'Іван', city_id: 1, city_name: 'Харків', is_active: true }),
+        makeWorker({ id: 2, name: 'Петро', city_id: 1, city_name: 'Харків', is_active: true }),
+      ],
+    });
+    const user = userEvent.setup();
+    render(<AdminApp />);
+    await screen.findByRole('heading', { name: 'Заявки (1)' });
+
+    await user.click(within(leadRow(41)).getByRole('button', { name: 'Призначити' }));
+    const select = await within(leadRow(41)).findByRole('combobox');
+    expect(Array.from(select.querySelectorAll('option')).map((o) => o.textContent)).toEqual([
+      'Петро (Харків) · Мотоблок',
+    ]);
+    expect(within(leadRow(41)).getByRole('button', { name: 'Закрити' })).toBeTruthy();
+    expect(within(leadRow(41)).queryByRole('button', { name: 'Скасувати' })).toBeNull();
+  });
+
+  it('shows assign errors in Ukrainian next to the picker', async () => {
+    fakeBackend({
+      leads: [makeLead({ status: 'assigned', worker_id: 1, worker_name: 'Іван' })],
+      workers: [
+        makeWorker({ id: 1, name: 'Іван', city_id: 1, city_name: 'Харків', is_active: true }),
+        makeWorker({ id: 2, name: 'Петро', city_id: 1, city_name: 'Харків', is_active: true }),
+      ],
+    });
+    const user = userEvent.setup();
+    render(<AdminApp />);
+    await screen.findByRole('heading', { name: 'Заявки (1)' });
+
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('/assign') && init?.method === 'POST') {
+          return new Response(
+            JSON.stringify({
+              error: 'Lead is already assigned to this worker',
+              code: 'ALREADY_ASSIGNED',
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return originalFetch(input, init);
+      }),
+    );
+
+    await user.click(within(leadRow(41)).getByRole('button', { name: 'Призначити' }));
+    await within(leadRow(41)).findByRole('combobox');
+    await user.click(within(leadRow(41)).getByRole('button', { name: 'Призначити' }));
+
+    expect(
+      await within(leadRow(41)).findByText('Ця заявка вже призначена цьому виконавцю'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Lead is already assigned to this worker')).toBeNull();
+  });
+
   it('loads more pages on demand', async () => {
     const leads = Array.from({ length: 55 }, (_, i) => makeLead({ id: i + 1 }));
     fakeBackend({ leads });
