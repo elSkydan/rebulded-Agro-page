@@ -496,6 +496,22 @@ class TelegramService {
   }
 
   /**
+   * Free-form admin alert (lead save failures before an id exists, uptime, etc.).
+   * May throw; callers should .catch.
+   *
+   * @param {number} adminChatId
+   * @param {string} text
+   */
+  async notifyAdminMessage(adminChatId, text) {
+    const body = String(text || '').trim().slice(0, 3500);
+    if (!body) return;
+    await this._post('sendMessage', {
+      chat_id: this._serializeChatId(adminChatId),
+      text:    body.startsWith('Admin alert') ? body : `Admin alert — ${body}`,
+    });
+  }
+
+  /**
    * Expose buildLeadText as an instance method so existing callers
    * (telegram.js route) can call telegramService.buildLeadText(…).
    */

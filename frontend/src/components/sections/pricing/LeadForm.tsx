@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Check, CheckCircle, ChevronDown, Send } from 'lucide-react';
 import { ApiError, createLead, fetchPublicCities, type PublicCity } from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { siteConfig } from '@/lib/config';
 import { SERVICE_OPTIONS, isActiveRegion } from '@/lib/content';
+import { clearPendingLead, readPendingLead } from '@/lib/leadQueue';
+import { formatPhone, isValidPhone } from '@/lib/phone';
 import {
   AREA_OPTIONAL_SERVICES,
   MAX_AREA_DISPLAY,
@@ -25,26 +27,6 @@ const PERKS = [
 
 const REGION_NOTICE =
   'Зараз працюємо в Харкові та області. Ви з іншого міста? Залиште заявку — повідомимо, щойно запрацюємо у вашому регіоні.';
-
-/** Formats raw digits into "+38 (0XX) XXX-XX-XX" as the user types. */
-function formatPhone(raw: string): string {
-  let val = raw.replace(/\D/g, '');
-  if (val.startsWith('0')) val = '38' + val;
-  if (val.length > 12) val = val.slice(0, 12);
-
-  let formatted = '';
-  if (val.length > 0) formatted = '+' + val.slice(0, 2);
-  if (val.length > 2) formatted += ' (' + val.slice(2, 5);
-  if (val.length > 5) formatted += ') ' + val.slice(5, 8);
-  if (val.length > 8) formatted += '-' + val.slice(8, 10);
-  if (val.length > 10) formatted += '-' + val.slice(10, 12);
-
-  return formatted || raw;
-}
-
-function isValidPhone(val: string): boolean {
-  return val.replace(/\D/g, '').length >= 10;
-}
 
 function pickDefaultCityId(cities: PublicCity[]): number {
   const active = cities.find((c) => isActiveRegion(c.name));
@@ -77,6 +59,10 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
   const [phoneError, setPhoneError] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [status, setStatus] = useState<FormStatus>('idle');
+  const [pendingNotice, setPendingNotice] = useState(false);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const successRef = useRef<HTMLDivElement>(null);
+  const formTopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +83,43 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
       cancelled = true;
     };
   }, []);
+
+  // Flush a lead saved during an earlier outage (auto-retry once on mount).
+  useEffect(() => {
+    const pending = readPendingLead();
+    if (!pending) return;
+
+    let cancelled = false;
+    setPendingNotice(true);
+
+    void (async () => {
+      try {
+        await createLead(pending, { skipQueue: true });
+        if (cancelled) return;
+        clearPendingLead();
+        setPendingNotice(false);
+        setStatus('success');
+        trackEvent('generate_lead', {
+          service: pending.service_type,
+          area: pending.area,
+          value: 0,
+          queued_retry: true,
+        });
+      } catch {
+        if (!cancelled) setPendingNotice(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (status === 'success') {
+      successRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [status]);
 
   /** Effective area valid for the selected service (backend expects 0.5–50). */
   function effectiveArea(): number {
@@ -132,6 +155,8 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
 
     if (!isValidPhone(phone)) {
       setPhoneError(true);
+      phoneRef.current?.focus();
+      phoneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -139,16 +164,20 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
     setSubmitError(null);
 
     const area = effectiveArea();
+    const payload = {
+      name: name.trim(),
+      phone: phone.trim(),
+      service_type: service,
+      area,
+      city_id: cityId,
+      out_of_city: outOfCity,
+      comment: comment.trim() || undefined,
+    };
+
     try {
-      await createLead({
-        name: name.trim(),
-        phone: phone.trim(),
-        service_type: service,
-        area,
-        city_id: cityId,
-        out_of_city: outOfCity,
-        comment: comment.trim() || undefined,
-      });
+      await createLead(payload);
+      clearPendingLead();
+      setPendingNotice(false);
       trackEvent('generate_lead', {
         service,
         area,
@@ -157,16 +186,50 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
       setStatus('success');
     } catch (err) {
       setStatus('idle');
+      if (err instanceof ApiError && (err.code === 'NETWORK_ERROR' || err.code === 'BAD_GATEWAY')) {
+        setPendingNotice(true);
+      }
       if (err instanceof ApiError && err.message) {
         setSubmitError(err.message);
       } else {
         setSubmitError('Не вдалося надіслати заявку. Спробуйте ще раз або зателефонуйте нам.');
       }
+      formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  async function retryPending() {
+    const pending = readPendingLead();
+    if (!pending) {
+      setPendingNotice(false);
+      return;
+    }
+    setStatus('submitting');
+    setSubmitError(null);
+    try {
+      await createLead(pending, { skipQueue: true });
+      clearPendingLead();
+      setPendingNotice(false);
+      setStatus('success');
+      trackEvent('generate_lead', {
+        service: pending.service_type,
+        area: pending.area,
+        value: 0,
+        queued_retry: true,
+      });
+    } catch (err) {
+      setStatus('idle');
+      setPendingNotice(true);
+      setSubmitError(
+        err instanceof ApiError && err.message
+          ? err.message
+          : 'Сервіс ще недоступний. Заявку збережено — спробуйте знову за хвилину.',
+      );
     }
   }
 
   return (
-    <div className="min-w-0 rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+    <div ref={formTopRef} className="min-w-0 rounded-2xl overflow-hidden shadow-sm border border-gray-100">
       <div className="bg-primary-dark px-4 sm:px-5 py-3 flex items-center gap-3">
         <Send className="w-5 h-5 text-white shrink-0" aria-hidden="true" />
         <div className="min-w-0">
@@ -176,7 +239,7 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
       </div>
       <div className="bg-white p-4 sm:p-5">
         {status === 'success' ? (
-          <div className="text-center py-6">
+          <div ref={successRef} className="text-center py-6">
             <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
               <CheckCircle className="w-7 h-7 text-primary" aria-hidden="true" />
             </div>
@@ -189,6 +252,24 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
               <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
                 <p className="text-xs font-medium text-primary mb-0.5">До заявки додано</p>
                 <p className="text-sm text-gray-800">{estimateSummary}</p>
+              </div>
+            )}
+
+            {pendingNotice && (
+              <div
+                role="status"
+                className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900"
+              >
+                <p className="font-medium mb-1">Заявку збережено на цьому пристрої</p>
+                <p className="text-xs mb-2">Сервіс був недоступний. Можна надіслати повторно зараз.</p>
+                <button
+                  type="button"
+                  onClick={() => void retryPending()}
+                  disabled={status === 'submitting'}
+                  className="text-xs font-semibold underline hover:no-underline disabled:opacity-60"
+                >
+                  Надіслати збережену заявку
+                </button>
               </div>
             )}
 
@@ -212,9 +293,10 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
                 Номер телефону <span className="text-red-500">*</span>
               </label>
               <input
+                ref={phoneRef}
                 type="tel"
                 id="form-phone"
-                placeholder="+38 (___) ___ - __- __"
+                placeholder="+38 (0__) ___-__-__"
                 value={phone}
                 onChange={(e) => {
                   setPhone(formatPhone(e.target.value));
@@ -222,10 +304,16 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
                 }}
                 required
                 autoComplete="tel"
-                className="w-full max-w-full border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                aria-invalid={phoneError || undefined}
+                aria-describedby={phoneError ? 'form-phone-error' : undefined}
+                className={`w-full max-w-full border rounded-xl px-3 sm:px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${
+                  phoneError ? 'border-red-400' : 'border-gray-200'
+                }`}
               />
               {phoneError && (
-                <p className="text-red-500 text-xs mt-1">Введіть коректний номер телефону</p>
+                <p id="form-phone-error" className="text-red-500 text-xs mt-1" role="alert">
+                  Введіть коректний номер телефону (+380…)
+                </p>
               )}
             </div>
 

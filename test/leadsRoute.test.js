@@ -32,7 +32,11 @@ stub('db/pool', {
     return next;
   },
 });
-stub('config/config', { ...require('../config/config'), ADMIN_TOKEN: TOKEN });
+stub('config/config', {
+  ...require('../config/config'),
+  ADMIN_TOKEN: TOKEN,
+  ADMIN_CHAT_ID: 999001,
+});
 const assignmentStub = {
   assignLead: async () => ({ assigned: false }),
   assignLeadToWorker: async () => ({
@@ -43,6 +47,16 @@ const assignmentStub = {
   }),
 };
 stub('server/services/assignmentService', assignmentStub);
+
+const telegramAlerts = [];
+stub('server/services/telegramService', {
+  notifyAdmin: async (chatId, leadId, reason) => {
+    telegramAlerts.push({ type: 'lead', chatId, leadId, reason });
+  },
+  notifyAdminMessage: async (chatId, text) => {
+    telegramAlerts.push({ type: 'message', chatId, text });
+  },
+});
 
 const leadsRoute = require('../server/routes/leads');
 
@@ -65,6 +79,8 @@ after(() => new Promise((resolve) => server.close(resolve)));
 beforeEach(() => {
   queries.length = 0;
   results = [];
+  telegramAlerts.length = 0;
+  assignmentStub.assignLead = async () => ({ assigned: false });
 });
 
 const auth = { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
@@ -205,5 +221,63 @@ describe('POST /api/leads/:id/assign', () => {
       worker_id: 2,
       worker_name: 'Іван',
     });
+  });
+});
+
+const publicLeadBody = {
+  name: 'Test',
+  phone: '+380671112233',
+  service_type: 'ogorod',
+  area: 6,
+  city_id: 1,
+  out_of_city: false,
+};
+
+describe('POST /api/leads — admin alerts', () => {
+  test('notifies admin when assignLead throws after the lead was saved', async () => {
+    assignmentStub.assignLead = async () => {
+      throw new Error('telegram down');
+    };
+    results = [
+      { rows: [{ id: 1, name: 'Харків', delivery_price: 0, delivery_type: 'fixed' }] },
+      { rows: [] },
+      { rows: [{ id: 77 }] },
+    ];
+
+    const res = await fetch(base, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(publicLeadBody),
+    });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.lead_id, 77);
+    assert.equal(body.assigned, false);
+    assert.match(body.message, /admin has been notified/i);
+    assert.ok(
+      telegramAlerts.some((a) => a.type === 'message' && /Lead #77: assignment failed/i.test(a.text)),
+      `expected assignment alert, got ${JSON.stringify(telegramAlerts)}`,
+    );
+  });
+
+  test('notifies admin when the lead insert fails', async () => {
+    const dbErr = new Error('connection lost');
+    dbErr.code = 'ECONNREFUSED';
+    results = [
+      { rows: [{ id: 1, name: 'Харків', delivery_price: 0, delivery_type: 'fixed' }] },
+      { rows: [] },
+      dbErr,
+    ];
+
+    const res = await fetch(base, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(publicLeadBody),
+    });
+    assert.equal(res.status, 500);
+    assert.ok(
+      telegramAlerts.some((a) => a.type === 'message' && /Lead save failed/i.test(a.text)),
+      `expected save alert, got ${JSON.stringify(telegramAlerts)}`,
+    );
   });
 });

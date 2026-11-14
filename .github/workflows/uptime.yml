@@ -1,0 +1,71 @@
+# Prod availability check for issue #32.
+# Expects:
+#   GET /api/cities/public → 200
+#   GET /api/leads         → 401 (auth required = API is up, not 502)
+#
+# Optional secrets for Telegram alerts on failure:
+#   UPTIME_TELEGRAM_BOT_TOKEN
+#   UPTIME_TELEGRAM_CHAT_ID
+
+name: Uptime
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check /api/cities/public
+        id: cities
+        run: |
+          set -e
+          code=$(curl -sS -o /tmp/cities.json -w '%{http_code}' \
+            --max-time 30 \
+            'https://agro-aggregator.com.ua/api/cities/public')
+          echo "http_code=$code" >> "$GITHUB_OUTPUT"
+          echo "cities status: $code"
+          test "$code" = "200"
+          python3 - <<'PY'
+          import json, sys
+          data = json.load(open('/tmp/cities.json'))
+          assert isinstance(data, list) and len(data) >= 1, data
+          print(f'cities ok: {len(data)} items')
+          PY
+
+      - name: Check /api/leads (expect 401 = up)
+        id: leads
+        run: |
+          set -e
+          code=$(curl -sS -o /tmp/leads.json -w '%{http_code}' \
+            --max-time 30 \
+            'https://agro-aggregator.com.ua/api/leads')
+          echo "http_code=$code" >> "$GITHUB_OUTPUT"
+          echo "leads status: $code"
+          # 401 means Express auth is reachable; 502/503/504 means proxy/API down.
+          test "$code" = "401"
+
+      - name: Telegram alert on failure
+        if: failure()
+        env:
+          BOT: ${{ secrets.UPTIME_TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.UPTIME_TELEGRAM_CHAT_ID }}
+          CITIES: ${{ steps.cities.outputs.http_code }}
+          LEADS: ${{ steps.leads.outputs.http_code }}
+        run: |
+          if [ -z "$BOT" ] || [ -z "$CHAT" ]; then
+            echo 'Telegram secrets not set — skipping notify'
+            exit 0
+          fi
+          text="Admin alert — Uptime check failed
+          cities/public → ${CITIES:-n/a}
+          leads → ${LEADS:-n/a}
+          run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          curl -sS -X POST "https://api.telegram.org/bot${BOT}/sendMessage" \
+            -d chat_id="$CHAT" \
+            --data-urlencode "text=$text" \
+            -d disable_web_page_preview=true \
+            >/dev/null

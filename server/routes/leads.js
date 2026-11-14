@@ -16,11 +16,27 @@ const router   = express.Router();
 const pool     = require('../../db/pool');
 const { calcPrice }                    = require('../services/pricingService');
 const assignmentService = require('../services/assignmentService');
+const telegramService                  = require('../services/telegramService');
 const rateLimiter                      = require('../middlewares/rateLimiter');
 const { validateLead, normalizePhone } = require('../middlewares/validateLead');
 const auth                             = require('../middlewares/auth');
-const { SPAM_WINDOW_MINUTES }          = require('../../config/config');
+const { SPAM_WINDOW_MINUTES, ADMIN_CHAT_ID } = require('../../config/config');
 const { respondLeadDbError }           = require('../utils/pgLeadError');
+
+/** Fire-and-forget Telegram alert — never throws into the request path. */
+function alertAdmin(message) {
+  if (!ADMIN_CHAT_ID) return;
+  telegramService
+    .notifyAdminMessage(ADMIN_CHAT_ID, message)
+    .catch((err) => console.error('[POST /leads] notifyAdmin failed:', err.message));
+}
+
+function failLeadDb(res, err, logPrefix) {
+  alertAdmin(
+    `Lead save failed (${logPrefix}): ${err.code || 'ERR'} ${String(err.message || '').slice(0, 400)}`
+  );
+  return respondLeadDbError(res, err, logPrefix);
+}
 
 // Statuses that mean the lead lifecycle is over — allow new lead from same phone
 const TERMINAL_STATUSES = ['completed', 'canceled', 'failed_contact'];
@@ -83,7 +99,7 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
     }
     city = rows[0];
   } catch (err) {
-    return respondLeadDbError(res, err, '[POST /leads] city lookup');
+    return failLeadDb(res, err, '[POST /leads] city lookup');
   }
 
   // ── Server-side price calculation ───────────────────────
@@ -111,7 +127,7 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
     );
     existingLead = rows[0] ?? null;
   } catch (err) {
-    return respondLeadDbError(res, err, '[POST /leads] spam check');
+    return failLeadDb(res, err, '[POST /leads] spam check');
   }
 
   // ── Upsert lead ─────────────────────────────────────────
@@ -137,7 +153,7 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
       );
       leadId = existingLead.id;
     } catch (err) {
-      return respondLeadDbError(res, err, '[POST /leads] update existing lead');
+      return failLeadDb(res, err, '[POST /leads] update existing lead');
     }
   } else {
     // New lead
@@ -153,7 +169,7 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
       );
       leadId = rows[0].id;
     } catch (err) {
-      return respondLeadDbError(res, err, '[POST /leads] insert lead');
+      return failLeadDb(res, err, '[POST /leads] insert lead');
     }
   }
 
@@ -163,7 +179,10 @@ router.post('/', rateLimiter, validateLead, async (req, res) => {
     assignmentResult = await assignmentService.assignLead(leadId, city_id);
   } catch (err) {
     console.error(`[POST /leads] assignLead failed for lead ${leadId}:`, err);
-    // Lead is already persisted; return 201 but flag that assignment failed
+    // Lead is already persisted; alert admin and return 201 with a truthful flag.
+    alertAdmin(
+      `Lead #${leadId}: assignment failed after save — ${String(err.message || err).slice(0, 400)}`
+    );
     return res.status(201).json({
       lead_id:         leadId,
       total_price:     totalPrice,
