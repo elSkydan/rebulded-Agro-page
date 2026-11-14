@@ -142,6 +142,7 @@ export const NAV_LINKS = [
   { href: '/pricing', label: 'Ціни' },
   { href: '/works', label: 'Роботи' },
   { href: '/reviews', label: 'Відгуки' },
+  { href: '/contractors', label: 'Стати виконавцем' },
   { href: '/contacts', label: 'Контакти' },
 ];
 

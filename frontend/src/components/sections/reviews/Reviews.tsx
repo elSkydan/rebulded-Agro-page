@@ -26,7 +26,7 @@ export function Reviews() {
             Відгуки
           </span>
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
-            Що кажуть клієнти в {siteConfig.region}у
+            Що кажуть клієнти в {siteConfig.regionLocative}
           </h1>
           <p className="text-gray-500 text-base sm:text-lg">
             Реальні історії з ділянок. Повний список і актуальний рейтинг — у нашому профілі Google.
