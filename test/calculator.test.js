@@ -46,8 +46,11 @@ test('mowing: 200 UAH/sot., minimum area 10', () => {
   assert.strictEqual(calcPrice('mowing', 9.4, false, cityFree), 2000);
 });
 
-test('tree and washing: fixed minimums, floor MIN_ORDER (1500)', () => {
+test('tree, washing, drilling: fixed minimums, floor MIN_ORDER (1500)', () => {
   assert.strictEqual(calcPrice('tree', 1, false, cityFree), 1500);
   assert.strictEqual(calcPrice('washing', 1, false, cityFree), 1500);
+  assert.strictEqual(calcPrice('drilling', 1, false, cityFree), 1500);
   assert.strictEqual(calcPrice('tree', 0.4, false, cityFree), 1500);
+  // 250 + 800 = 1050 < MIN_ORDER → still floors to 1500 (gap shown as «Виїзд» in UI)
+  assert.strictEqual(calcPrice('washing', 1, true, cityFree), 1500);
 });

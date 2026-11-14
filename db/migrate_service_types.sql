@@ -9,3 +9,4 @@
 ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'mowing';
 ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'tree';
 ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'washing';
+ALTER TYPE service_type_enum ADD VALUE IF NOT EXISTS 'drilling';

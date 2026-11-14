@@ -42,11 +42,12 @@ class TelegramDeliveryError extends Error {
 // ---------------------------------------------------------------------------
 
 const SERVICE_LABELS = {
-  ogorod:  'Garden tilling',
-  celina:  'Virgin land',
-  mowing:  'Mowing',
-  tree:    'Tree work',
-  washing: 'Washing',
+  ogorod:   'Garden tilling',
+  celina:   'Virgin land',
+  mowing:   'Mowing',
+  tree:     'Tree work',
+  washing:  'Washing',
+  drilling: 'Hole drilling',
 };
 
 /**

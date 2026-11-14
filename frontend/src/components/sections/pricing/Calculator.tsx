@@ -3,15 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Calculator as CalculatorIcon, ChevronDown, TriangleAlert } from 'lucide-react';
 import {
-  AREA_OPTIONAL_SERVICES,
+  AREA_HIDDEN_SERVICES,
   MAX_AREA_DISPLAY,
   OUT_OF_CITY_RADIUS_KM,
   OUT_OF_CITY_SURCHARGE_UAH,
   SERVICE_UI_NOTE,
+  buildPriceBreakdown,
   calcClientPreview,
   formatArea,
-  formatFormula,
   minAreaForService,
+  parseAreaInput,
   type ServiceType,
 } from '@/lib/pricing';
 import { SERVICE_OPTIONS } from '@/lib/content';
@@ -44,10 +45,12 @@ export function Calculator({
   useEffect(() => {
     const timer = setTimeout(() => {
       setApplied({ service, areaInput, outOfCity });
-      // Clamp the visible input when the value is out of bounds for the service
+      // Soft-clamp only the minimum: keep oversized values visible so the
+      // «> 50 соток» hint can explain the capped estimate.
+      if (AREA_HIDDEN_SERVICES.has(service)) return;
       const p = calcClientPreview(service, areaInput, outOfCity);
-      if (p.ok && (p.wasClampedMin || p.wasClampedMax)) {
-        onAreaChange(String(p.area));
+      if (p.ok && p.wasClampedMin && p.area != null) {
+        onAreaChange(formatArea(p.area));
       }
     }, CALC_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -55,8 +58,14 @@ export function Calculator({
 
   const preview = calcClientPreview(applied.service, applied.areaInput, applied.outOfCity);
   const minA = minAreaForService(applied.service);
-  const areaDimmed = AREA_OPTIONAL_SERVICES.has(service);
+  const areaHidden = AREA_HIDDEN_SERVICES.has(service);
   const priceText = preview.ok ? `${preview.total} грн` : '— грн';
+  const breakdown =
+    preview.ok && preview.area != null
+      ? buildPriceBreakdown(applied.service, preview.area, applied.outOfCity, preview)
+      : null;
+  const overMaxHint =
+    !areaHidden && Number.isFinite(parseAreaInput(areaInput)) && parseAreaInput(areaInput) > MAX_AREA_DISPLAY;
 
   // Pulse animation when the total changes
   useEffect(() => {
@@ -74,7 +83,7 @@ export function Calculator({
         <CalculatorIcon className="w-5 h-5 text-white shrink-0" aria-hidden="true" />
         <div className="min-w-0">
           <h2 className="text-white font-semibold text-sm sm:text-base">Калькулятор вартості</h2>
-          <p className="text-white/70 text-xs">Оберіть послугу і площу</p>
+          <p className="text-white/70 text-xs">Оберіть послугу і параметри</p>
         </div>
       </div>
       <div className="bg-white p-4 sm:p-5">
@@ -105,39 +114,39 @@ export function Calculator({
           </p>
         </div>
 
-        {/* Area (sotkas) */}
-        <div
-          className="mb-3 sm:mb-4"
-          style={{
-            opacity: areaDimmed ? 0.45 : 1,
-            pointerEvents: areaDimmed ? 'none' : 'auto',
-          }}
-        >
-          <label htmlFor="calc-area-input" className="block text-sm font-medium text-gray-700 mb-1.5">
-            Площа (соток)
-          </label>
-          <input
-            id="calc-area-input"
-            type="number"
-            min={minAreaForService(service)}
-            max={MAX_AREA_DISPLAY}
-            step={0.5}
-            inputMode="decimal"
-            value={areaInput}
-            onChange={(e) => onAreaChange(e.target.value)}
-            className="w-full max-w-full border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Мін. {formatArea(minA)} · макс. {MAX_AREA_DISPLAY} сот. · крок 0,5
-            {preview.ok ? (
-              <>
-                {' '}
-                · для розрахунку:{' '}
-                <span className="text-primary font-semibold">{formatArea(preview.area)}</span>
-              </>
+        {/* Area (sotkas) — hidden for fixed-price services */}
+        {!areaHidden ? (
+          <div className="mb-3 sm:mb-4">
+            <label htmlFor="calc-area-input" className="block text-sm font-medium text-gray-700 mb-1.5">
+              Площа (соток)
+            </label>
+            <input
+              id="calc-area-input"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={areaInput}
+              onChange={(e) => onAreaChange(e.target.value)}
+              className="w-full max-w-full border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Мін. {formatArea(minA)} · макс. {MAX_AREA_DISPLAY} сот. · крок 0,5
+              {preview.ok ? (
+                <>
+                  {' '}
+                  · для розрахунку:{' '}
+                  <span className="text-primary font-semibold">{formatArea(preview.area)}</span>
+                </>
+              ) : null}
+            </p>
+            {overMaxHint ? (
+              <p className="text-xs text-amber-800 mt-1.5" role="status">
+                Більше 50 соток — індивідуальний розрахунок. Нижче — орієнтир за максимумом{' '}
+                {MAX_AREA_DISPLAY} сот.
+              </p>
             ) : null}
-          </p>
-        </div>
+          </div>
+        ) : null}
 
         {/* Outskirts & grass */}
         <div className="mb-3 flex flex-col gap-2">
@@ -175,9 +184,20 @@ export function Calculator({
           </div>
         </div>
 
-        {/* Price formula display */}
-        <div className="text-xs sm:text-sm text-gray-500 mb-2 break-words">
-          {formatFormula(applied.service, preview.ok ? preview.area : NaN, applied.outOfCity, preview)}
+        {/* Price formula — line items that sum to total */}
+        <div className="text-xs sm:text-sm text-gray-500 mb-2 space-y-1" aria-live="polite">
+          {!preview.ok ? (
+            <p>Вкажіть числову площу (можна з комою: 12,5)</p>
+          ) : breakdown ? (
+            breakdown.lines.map((line) => (
+              <div key={line.label} className="flex justify-between gap-3 break-words">
+                <span className="min-w-0">{line.label}</span>
+                <span className="shrink-0 tabular-nums text-gray-700">
+                  {line.informational ? '—' : `${line.amount} грн`}
+                </span>
+              </div>
+            ))
+          ) : null}
         </div>
 
         {/* Price result */}

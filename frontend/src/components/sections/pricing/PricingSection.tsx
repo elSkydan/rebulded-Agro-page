@@ -3,21 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { trackEvent } from '@/lib/analytics';
-import { minAreaForService, type ServiceType } from '@/lib/pricing';
+import {
+  isCalculatorService,
+  minAreaForService,
+  parseAreaInput,
+  parseServiceParam,
+  type ServiceType,
+} from '@/lib/pricing';
 import { Calculator } from './Calculator';
 import { LeadForm } from './LeadForm';
 
-const SERVICE_TYPES: ReadonlySet<string> = new Set([
-  'ogorod',
-  'celina',
-  'mowing',
-  'tree',
-  'washing',
-]);
-
-function parseServiceParam(raw: string | null): ServiceType | null {
-  if (!raw || !SERVICE_TYPES.has(raw)) return null;
-  return raw as ServiceType;
+function toCalculatorService(type: ServiceType): ServiceType {
+  return isCalculatorService(type) ? type : 'ogorod';
 }
 
 /**
@@ -30,7 +27,7 @@ function parseServiceParam(raw: string | null): ServiceType | null {
  */
 export function PricingSection() {
   const searchParams = useSearchParams();
-  const initial = parseServiceParam(searchParams.get('service')) ?? 'ogorod';
+  const initial = toCalculatorService(parseServiceParam(searchParams.get('service')) ?? 'ogorod');
 
   const [service, setService] = useState<ServiceType>(initial);
   const [areaInput, setAreaInput] = useState<string>(String(minAreaForService(initial)));
@@ -40,8 +37,9 @@ export function PricingSection() {
   useEffect(() => {
     const fromQuery = parseServiceParam(searchParams.get('service'));
     if (!fromQuery) return;
-    setService(fromQuery);
-    setAreaInput(String(minAreaForService(fromQuery)));
+    const next = toCalculatorService(fromQuery);
+    setService(next);
+    setAreaInput(String(minAreaForService(next)));
   }, [searchParams]);
 
   useEffect(() => {
@@ -52,7 +50,7 @@ export function PricingSection() {
     const timer = setTimeout(() => {
       trackEvent('calculator_change', {
         service,
-        area: Number(areaInput) || 0,
+        area: parseAreaInput(areaInput) || 0,
       });
     }, 300);
     return () => clearTimeout(timer);

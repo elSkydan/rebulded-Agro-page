@@ -34,7 +34,7 @@ const spec = {
       // ── Enums ─────────────────────────────────────────────────────────────
       ServiceType: {
         type: 'string',
-        enum: ['ogorod', 'celina', 'mowing', 'tree', 'washing'],
+        enum: ['ogorod', 'celina', 'mowing', 'tree', 'washing', 'drilling'],
         description: 'Type of agricultural service',
       },
       LeadStatus: {
