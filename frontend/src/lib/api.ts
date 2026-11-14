@@ -1,4 +1,5 @@
 import type { ServiceType } from './pricing';
+import { enqueuePendingLead } from './leadQueue';
 
 /**
  * API client for the Express backend.
@@ -48,8 +49,13 @@ function gatewayUnavailable(status: number): boolean {
   return status === 502 || status === 503 || status === 504;
 }
 
+function rememberForRetry(payload: CreateLeadPayload): void {
+  enqueuePendingLead(payload);
+}
+
 export async function createLead(
   payload: CreateLeadPayload,
+  options: { skipQueue?: boolean } = {},
 ): Promise<CreateLeadResponse> {
   let res: Response;
   try {
@@ -59,8 +65,9 @@ export async function createLead(
       body: JSON.stringify(payload),
     });
   } catch {
+    if (!options.skipQueue) rememberForRetry(payload);
     throw new ApiError(
-      "Немає зв'язку з сервером. Перевірте інтернет або спробуйте пізніше.",
+      "Немає зв'язку з сервером. Заявку збережено на цьому пристрої — надішлемо, щойно сервіс оживає.",
       0,
       'NETWORK_ERROR',
     );
@@ -70,8 +77,9 @@ export async function createLead(
 
   if (!res.ok) {
     if (gatewayUnavailable(res.status)) {
+      if (!options.skipQueue) rememberForRetry(payload);
       throw new ApiError(
-        'Сервіс заявок тимчасово недоступний. Спробуйте пізніше або зателефонуйте нам.',
+        'Сервіс заявок тимчасово недоступний. Заявку збережено на цьому пристрої — спробуємо ще раз автоматично.',
         res.status,
         'BAD_GATEWAY',
       );

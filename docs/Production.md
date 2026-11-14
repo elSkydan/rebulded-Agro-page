@@ -295,15 +295,44 @@ curl "https://api.telegram.org/bot{TOKEN}/deleteWebhook"
 
 ---
 
-## 9. Monitoring (Basic)
+## 9. Monitoring
+
+### Automated (GitHub Actions — issue #32)
+
+Workflow `.github/workflows/uptime.yml` runs every 15 minutes:
+
+| Check | Healthy response |
+|---|---|
+| `GET https://agro-aggregator.com.ua/api/cities/public` | **200** + JSON array |
+| `GET https://agro-aggregator.com.ua/api/leads` | **401** (auth required = API reachable; not 502) |
+
+On failure, if repo secrets are set, it posts to Telegram:
+
+- `UPTIME_TELEGRAM_BOT_TOKEN`
+- `UPTIME_TELEGRAM_CHAT_ID` (usually the same as `ADMIN_CHAT_ID`)
+
+Also recommended: [UptimeRobot](https://uptimerobot.com/) (or Better Stack) HTTP monitors on the same two URLs with alert → Telegram. Keep Render API on a paid plan (or external cron ping) so free-tier hibernate does not look like an outage.
+
+### Backend alerts
+
+`POST /api/leads` notifies `ADMIN_CHAT_ID` when:
+
+- a DB write fails (city lookup / insert / update / spam check);
+- `assignLead` throws after the lead was already saved (message is truthful).
+
+### Manual
 
 ```bash
 # Check PM2 status
 pm2 status
 pm2 logs agroservice
 
-# Check health endpoint
-curl https://your-domain.com/health
+# Check health endpoint (API service directly)
+curl https://your-api.onrender.com/health
+
+# Through the public site proxy
+curl -i https://agro-aggregator.com.ua/api/cities/public
+curl -i https://agro-aggregator.com.ua/api/leads
 
 # Check Telegram webhook status
 curl "https://api.telegram.org/bot{TOKEN}/getWebhookInfo"
