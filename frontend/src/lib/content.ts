@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { StaticImageData } from 'next/image';
 import { SERVICE_CATALOG } from './services-catalog';
+import { siteConfig } from './config';
 import celinaBefore from '@/assets/works/celina-before.jpg';
 import celinaAfter from '@/assets/works/celina-after.jpg';
 import pokosBefore from '@/assets/works/pokos-before.jpg';
@@ -57,7 +58,7 @@ export const HERO_CARDS: HeroCard[] = [
   { icon: Truck, label: 'Транспорт', value: 'Nissan Primastar' },
   { icon: Settings, label: 'Мотоблок', value: 'Powercraft МБ 1012Д' },
   { icon: Zap, label: 'Потужність', value: '12 к.с. дизель' },
-  { icon: Navigation, label: 'Виїзд', value: 'Місто та за містом' },
+  { icon: Navigation, label: 'Виїзд', value: siteConfig.serviceArea },
 ];
 
 export interface WorkStep {
@@ -70,7 +71,7 @@ export const WORK_STEPS: WorkStep[] = [
   {
     icon: PhoneCall,
     title: 'Дзвінок',
-    description: 'Зателефонуйте або залиште заявку — передзвонимо за 15 хвилин',
+    description: `Зателефонуйте або залиште заявку. ${siteConfig.callbackPromise}`,
   },
   {
     icon: Calculator,
@@ -98,13 +99,13 @@ export interface BeforeAfterItem {
 
 export const BEFORE_AFTER_ITEMS: BeforeAfterItem[] = [
   {
-    title: 'Обробка целини',
+    title: 'Обробка цілини',
     subtitle: 'Запущена ділянка → готовий ґрунт',
     beforeImage: celinaBefore,
     afterImage: celinaAfter,
   },
   {
-    title: 'Покос трави',
+    title: 'Покіс трави',
     subtitle: 'Висока трава → акуратний газон',
     beforeImage: pokosBefore,
     afterImage: pokosAfter,
@@ -171,7 +172,7 @@ export const REVIEW_ITEMS: ReviewItem[] = [
   {
     author: 'Олена К.',
     city: 'Харків',
-    service: 'Вспашка городу',
+    service: 'Оранка городу',
     rating: 5,
     dateLabel: 'жовтень 2026',
     text: 'Залишила заявку ввечері — наступного ранку вже працювали на ділянці. Порахували по калькулятору, без сюрпризів. Дякую!',
@@ -179,7 +180,7 @@ export const REVIEW_ITEMS: ReviewItem[] = [
   {
     author: 'Андрій М.',
     city: 'Харківська область',
-    service: 'Покос трави',
+    service: 'Покіс трави',
     rating: 5,
     dateLabel: 'вересень 2026',
     text: 'Велика ділянка за містом. Приїхали вчасно, зробили акуратно. Оплата після роботи — так і домовились.',
@@ -187,10 +188,10 @@ export const REVIEW_ITEMS: ReviewItem[] = [
   {
     author: 'Ірина С.',
     city: 'Харків',
-    service: 'Обробка целини',
+    service: 'Обробка цілини',
     rating: 4,
     dateLabel: 'серпень 2026',
-    text: 'Целина була запущена кілька років. Виконавець пояснив, що саме зроблять, і вклались у погоджений обсяг.',
+    text: 'Цілина була запущена кілька років. Виконавець пояснив, що саме зроблять, і вклались у погоджений обсяг.',
   },
 ];
 

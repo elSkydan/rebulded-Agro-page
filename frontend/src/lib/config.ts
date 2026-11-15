@@ -15,6 +15,11 @@ export const siteConfig = {
   phoneDisplay: process.env.NEXT_PUBLIC_PHONE_DISPLAY ?? '+38 (067) 902-03-26',
   email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? 'info@agro-aggregator.com.ua',
   workingHours: 'Пн–Нд: 7:00 – 20:00',
+  /** Single response-time promise used across the site. */
+  callbackPromise: 'Передзвонимо протягом 15 хвилин у робочий час (7:00–20:00)',
+  /** Single service-area wording used across the site. */
+  serviceArea: 'Харків і область',
+  serviceAreaNotice: 'Працюємо в Харкові та області. Інші міста — за домовленістю.',
   /** Active service region for SEO / local intent */
   region: 'Харків',
   /** Locative case («у Харкові») — do not append endings to `region`. */

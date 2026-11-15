@@ -175,10 +175,10 @@ export function Calculator({
             />
             <div className="min-w-0">
               <label htmlFor="grass-present-cb" className="text-sm font-semibold text-gray-800 cursor-pointer">
-                Висока трава / поросль
+                Ділянка заросла високою травою
               </label>
               <p className="text-xs text-gray-500 mt-0.5">
-                Лише для менеджера — на ціну не впливає
+                На ціну не впливає — напишіть про це в коментарі до заявки
               </p>
             </div>
           </div>

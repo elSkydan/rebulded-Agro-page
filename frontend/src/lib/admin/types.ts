@@ -103,9 +103,9 @@ export const ASSIGNABLE_LEAD_STATUSES: ReadonlySet<LeadStatus> = new Set([
 export type LeadServiceType = 'ogorod' | 'celina' | 'mowing' | 'tree' | 'washing' | 'drilling';
 
 export const SERVICE_TYPE_LABELS: Record<LeadServiceType, string> = {
-  ogorod: 'Огород / вспашка',
+  ogorod: 'Город / оранка',
   celina: 'Цілина',
-  mowing: 'Покос трави',
+  mowing: 'Покіс трави',
   tree: 'Демонтаж дерева',
   washing: 'Мийка техніки',
   drilling: 'Буріння лунок',

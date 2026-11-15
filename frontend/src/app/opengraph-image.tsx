@@ -59,7 +59,7 @@ export default async function OpengraphImage() {
             maxWidth: 980,
           }}
         >
-          Вспашка, целина і покос по всій Україні
+          Оранка, цілина і покіс у Харкові
         </div>
         <div
           style={{

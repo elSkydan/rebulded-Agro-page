@@ -17,7 +17,7 @@ const CONTACT_CARDS = [
   {
     icon: MapPin,
     title: 'Зона обслуговування',
-    body: 'Зараз працюємо в регіоні Харків. Виїзд в інші міста — за домовленістю',
+    body: siteConfig.serviceAreaNotice,
   },
 ];
 

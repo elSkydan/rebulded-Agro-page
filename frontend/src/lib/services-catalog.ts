@@ -44,11 +44,11 @@ export const SERVICE_CATALOG: readonly ServiceCatalogEntry[] = [
   {
     type: 'ogorod',
     slug: 'vspashka',
-    label: 'Огород / вспашка',
-    cardTitle: 'Вспашка і культивація',
+    label: 'Город / оранка',
+    cardTitle: 'Оранка і культивація',
     cardDescription:
-      'Обробка огородів та присадибних ділянок потужним дизельним мотоблоком. Ширина захвату фрези 1 м, глибина культивації до 18 см, вспашки до 25–30 см.',
-    cardPrice: 'від 300 грн',
+      'Обробка городів та присадибних ділянок потужним дизельним мотоблоком. Ширина захвату фрези 1 м, глибина культивації до 18 см, оранки до 25–30 см.',
+    cardPrice: 'від 300 грн/сотку',
     cardBadge: 'Популярно',
     icon: Tractor,
     pricingMode: 'area',
@@ -58,10 +58,10 @@ export const SERVICE_CATALOG: readonly ServiceCatalogEntry[] = [
     type: 'celina',
     slug: 'tsilyna',
     label: 'Цілина',
-    cardTitle: 'Обробка целини',
+    cardTitle: 'Обробка цілини',
     cardDescription:
-      'Обробка целини можлива будь-якої пори, навіть взимку за плюсової температури. Перетворимо запущену ділянку на готовий ґрунт під посадку.',
-    cardPrice: 'від 600 грн',
+      'Обробка цілини можлива будь-якої пори, навіть взимку за плюсової температури. Перетворимо запущену ділянку на готовий ґрунт під посадку.',
+    cardPrice: 'від 600 грн/сотку',
     icon: Shovel,
     pricingMode: 'area',
     uiNote: '',
@@ -69,14 +69,14 @@ export const SERVICE_CATALOG: readonly ServiceCatalogEntry[] = [
   {
     type: 'mowing',
     slug: 'pokos',
-    label: 'Покос трави',
-    cardTitle: 'Покос трави',
+    label: 'Покіс трави',
+    cardTitle: 'Покіс трави',
     cardDescription:
-      'Покос трави фрезами. Швидко та якісно обробимо ділянки від 10 соток — орієнтовно за ставкою калькулятора.',
-    cardPrice: 'від 200 грн/сот.',
+      'Покіс трави фрезами. Швидко та якісно обробимо ділянки від 10 соток.',
+    cardPrice: 'від 200 грн/сотку',
     icon: Wind,
     pricingMode: 'area',
-    uiNote: 'Покос виконується фрезами.',
+    uiNote: 'Покіс виконується фрезами.',
   },
   {
     type: 'drilling',
@@ -116,7 +116,7 @@ export const AREA_HIDDEN_SERVICES: ReadonlySet<ServiceType> = new Set<ServiceTyp
 export const SERVICE_UI_NOTE: Record<ServiceType, string> = {
   ogorod: '',
   celina: '',
-  mowing: 'Покос виконується фрезами.',
+  mowing: 'Покіс виконується фрезами.',
   drilling: 'Ціна за лунку — точна сума за кількістю на місці.',
   washing: '',
   tree: 'Точна ціна за домовленістю.',

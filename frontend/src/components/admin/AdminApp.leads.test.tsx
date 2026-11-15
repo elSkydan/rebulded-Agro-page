@@ -48,7 +48,7 @@ describe('AdminApp — leads', () => {
 
     expect(within(row).getByText('Олена')).toBeTruthy();
     expect(within(row).getByRole('link', { name: '+380671112233' }).getAttribute('href')).toBe('tel:+380671112233');
-    expect(within(row).getByText(/Огород \/ вспашка/)).toBeTruthy();
+    expect(within(row).getByText(/Город \/ оранка/)).toBeTruthy();
     expect(within(row).getByText(/6 сот\./)).toBeTruthy();
     expect(within(row).getByText(/1\s800 грн/)).toBeTruthy();
     expect(within(row).getByText(/Харків/)).toBeTruthy();

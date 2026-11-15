@@ -17,7 +17,7 @@ export function Hero() {
       <div className="hero-bg absolute inset-0">
         <Image
           src={pokosAfter}
-          alt="Покос трави мотоблоком у Харкові — результат роботи"
+          alt="Покіс трави мотоблоком у Харкові — результат роботи"
           fill
           priority
           fetchPriority="high"

@@ -19,7 +19,7 @@ export function Footer() {
               <span className="text-white font-semibold">{siteConfig.name}</span>
             </div>
             <p className="text-gray-400 text-sm">
-              Вспашка, целина і покос у Харкові — виїзд сьогодні
+              Оранка, цілина і покіс у Харкові — виїзд сьогодні
             </p>
           </div>
           <div className="flex flex-col sm:items-end gap-2">

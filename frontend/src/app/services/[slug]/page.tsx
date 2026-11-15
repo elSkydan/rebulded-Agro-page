@@ -65,7 +65,7 @@ export default async function ServiceLandingPage({ params }: PageProps) {
       <Breadcrumbs
         items={[
           { label: 'Послуги', href: '/services' },
-          { label: landing.title },
+          { label: landing.breadcrumb },
         ]}
       />
       <main className="flex-1">

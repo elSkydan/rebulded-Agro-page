@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
+import { siteConfig } from '@/lib/config';
 import { PricingSection } from '@/components/sections/pricing/PricingSection';
 
 export const metadata: Metadata = {
@@ -37,7 +38,7 @@ export default function PricingPage() {
               <p className="text-gray-500 text-sm sm:text-base">
                 Оберіть послугу, вкажіть площу — і одразу залишайте заявку.
                 <br className="hidden sm:block" />
-                Передзвонимо протягом 15 хвилин.
+                {siteConfig.callbackPromise}.
               </p>
             </div>
             <Suspense

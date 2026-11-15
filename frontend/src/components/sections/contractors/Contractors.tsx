@@ -15,7 +15,7 @@ export function Contractors() {
             Стати виконавцем у {siteConfig.regionLocative}
           </h1>
           <p className="text-gray-500 text-base sm:text-lg">
-            Отримуйте заявки на вспашку, целину та покос у Telegram. Без передплати від клієнта —
+            Отримуйте заявки на оранку, цілину та покіс у Telegram. Без передплати від клієнта —
             робота після підтвердження виїзду.
           </p>
         </div>
@@ -52,8 +52,8 @@ export function Contractors() {
         <div className="mb-12 border-t border-gray-200 pt-10">
           <h2 className="text-xl font-bold text-gray-900 mb-3">Скільки можна заробити</h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            Орієнтовні ставки на сайті: оранка від <strong>300 грн/сот.</strong>, покос від{' '}
-            <strong>200 грн/сот.</strong>, целина від <strong>600 грн/сот.</strong> Фактичний дохід
+            Орієнтовні ставки на сайті: оранка від <strong>300 грн/сот.</strong>, покіс від{' '}
+            <strong>200 грн/сот.</strong>, цілина від <strong>600 грн/сот.</strong> Фактичний дохід
             залежить від кількості прийнятих заявок, району та вашої завантаженості. Комісійна модель
             і деталі виплат узгоджуються під час підключення.
           </p>
