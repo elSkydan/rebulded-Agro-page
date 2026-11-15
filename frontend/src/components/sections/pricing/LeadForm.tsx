@@ -8,6 +8,7 @@ import { trackEvent } from '@/lib/analytics';
 import { siteConfig } from '@/lib/config';
 import { SERVICE_OPTIONS, isActiveRegion } from '@/lib/content';
 import { clearPendingLead, readPendingLead } from '@/lib/leadQueue';
+import { buildLeadComment, commentMaxLength } from '@/lib/leadComment';
 import { formatPhone, isValidPhone } from '@/lib/phone';
 import {
   AREA_HIDDEN_SERVICES,
@@ -43,11 +44,13 @@ interface LeadFormProps {
   /** Raw area from the calculator — used to build the API payload */
   areaInput: string;
   outOfCity: boolean;
+  /** «Ділянка заросла високою травою» from the calculator — sent in the comment. */
+  tallGrass: boolean;
 }
 
 type FormStatus = 'idle' | 'submitting' | 'success';
 
-export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: LeadFormProps) {
+export function LeadForm({ service, onServiceChange, areaInput, outOfCity, tallGrass }: LeadFormProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [comment, setComment] = useState('');
@@ -134,6 +137,7 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
         serviceLabel(service),
         showAreaInSummary ? `${formatArea(preview.area)} сот.` : null,
         outOfCity ? 'за містом' : null,
+        tallGrass ? 'висока трава' : null,
         `${preview.total} грн`,
       ]
         .filter(Boolean)
@@ -169,7 +173,7 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
       area,
       city_id: cityId,
       out_of_city: outOfCity,
-      comment: comment.trim() || undefined,
+      comment: buildLeadComment(comment, tallGrass),
     };
 
     try {
@@ -381,7 +385,7 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
                 placeholder="Адреса, зручний час…"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                maxLength={1000}
+                maxLength={commentMaxLength(tallGrass)}
                 className="w-full max-w-full border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
               />
             </div>
