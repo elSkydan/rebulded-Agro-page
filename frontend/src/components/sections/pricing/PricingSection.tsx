@@ -19,7 +19,7 @@ function toCalculatorService(type: ServiceType): ServiceType {
 
 /**
  * Owns the state shared between the calculator and the lead form.
- * Service/area/out-of-city stay in one place so both panels always match
+ * Service/area/out-of-city/tall-grass stay in one place so both panels always match
  * what gets submitted with the lead.
  *
  * Page chrome (H1 / intro) lives in the server `pricing/page.tsx` so crawlers
@@ -32,6 +32,7 @@ export function PricingSection() {
   const [service, setService] = useState<ServiceType>(initial);
   const [areaInput, setAreaInput] = useState<string>(String(minAreaForService(initial)));
   const [outOfCity, setOutOfCity] = useState(false);
+  const [tallGrass, setTallGrass] = useState(false);
   const skipFirstAnalytics = useRef(true);
 
   useEffect(() => {
@@ -69,9 +70,11 @@ export function PricingSection() {
           service={service}
           areaInput={areaInput}
           outOfCity={outOfCity}
+          tallGrass={tallGrass}
           onServiceChange={handleServiceChange}
           onAreaChange={setAreaInput}
           onOutOfCityChange={setOutOfCity}
+          onTallGrassChange={setTallGrass}
         />
       </div>
       <div className="min-w-0">
@@ -80,6 +83,7 @@ export function PricingSection() {
           onServiceChange={handleServiceChange}
           areaInput={areaInput}
           outOfCity={outOfCity}
+          tallGrass={tallGrass}
         />
       </div>
     </div>

@@ -104,7 +104,7 @@ export default function KharkivPage() {
                   href={`/services/${service.slug}`}
                   className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md transition-shadow"
                 >
-                  <h3 className="font-bold text-gray-900 mb-1">{service.title}</h3>
+                  <h3 className="font-bold text-gray-900 mb-1">{service.breadcrumb}</h3>
                   <p className="text-primary font-semibold text-sm mb-2">{service.priceLabel}</p>
                   <p className="text-gray-500 text-sm line-clamp-2">{service.intro}</p>
                 </Link>

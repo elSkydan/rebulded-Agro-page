@@ -23,18 +23,23 @@ interface CalculatorProps {
   service: ServiceType;
   areaInput: string;
   outOfCity: boolean;
+  /** Client-reported overgrown plot — sent with the lead, does not change the price. */
+  tallGrass: boolean;
   onServiceChange: (service: ServiceType) => void;
   onAreaChange: (value: string) => void;
   onOutOfCityChange: (value: boolean) => void;
+  onTallGrassChange: (value: boolean) => void;
 }
 
 export function Calculator({
   service,
   areaInput,
   outOfCity,
+  tallGrass,
   onServiceChange,
   onAreaChange,
   onOutOfCityChange,
+  onTallGrassChange,
 }: CalculatorProps) {
   // Debounced snapshot of the inputs — mirrors the 300ms debounce of the
   // legacy implementation so the price doesn't jump on every keystroke.
@@ -171,6 +176,8 @@ export function Calculator({
             <input
               id="grass-present-cb"
               type="checkbox"
+              checked={tallGrass}
+              onChange={(e) => onTallGrassChange(e.target.checked)}
               className="w-4 h-4 accent-primary mt-0.5 cursor-pointer shrink-0"
             />
             <div className="min-w-0">
@@ -178,7 +185,7 @@ export function Calculator({
                 Ділянка заросла високою травою
               </label>
               <p className="text-xs text-gray-500 mt-0.5">
-                На ціну не впливає — напишіть про це в коментарі до заявки
+                Передамо виконавцю разом із заявкою. На ціну не впливає
               </p>
             </div>
           </div>
