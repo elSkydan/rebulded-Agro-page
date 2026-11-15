@@ -5,13 +5,13 @@ const TILES = [
   {
     icon: MapPinned,
     title: 'Харків',
-    description: 'Послуги в активному регіоні — вспашка, целина, покос',
+    description: 'Послуги в активному регіоні — оранка, цілина, покіс',
     href: '/kharkiv',
   },
   {
     icon: Wrench,
     title: 'Послуги',
-    description: 'Вспашка, цілина, покос, буріння, мийка техніки',
+    description: 'Оранка, цілина, покіс, буріння, мийка техніки',
     href: '/services',
   },
   {

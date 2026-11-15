@@ -27,8 +27,7 @@ const PERKS = [
   'Оплата після виконання роботи',
 ];
 
-const REGION_NOTICE =
-  'Зараз працюємо в Харкові та області. Ви з іншого міста? Залиште заявку — повідомимо, щойно запрацюємо у вашому регіоні.';
+const REGION_NOTICE = `${siteConfig.serviceAreaNotice} Залиште заявку — уточнимо можливість виїзду.`;
 
 function pickDefaultCityId(cities: PublicCity[]): number {
   const active = cities.find((c) => isActiveRegion(c.name));
@@ -233,7 +232,7 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
         <Send className="w-5 h-5 text-white shrink-0" aria-hidden="true" />
         <div className="min-w-0">
           <h2 className="text-white font-semibold text-sm sm:text-base">Залишити заявку</h2>
-          <p className="text-white/70 text-xs">Передзвонимо протягом 15 хвилин</p>
+          <p className="text-white/70 text-xs">{siteConfig.callbackPromise}</p>
         </div>
       </div>
       <div className="bg-white p-4 sm:p-5">
@@ -243,7 +242,7 @@ export function LeadForm({ service, onServiceChange, areaInput, outOfCity }: Lea
               <CheckCircle className="w-7 h-7 text-primary" aria-hidden="true" />
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-1">Заявку прийнято!</h3>
-            <p className="text-gray-500 text-sm">Передзвонимо вам протягом 15 хвилин</p>
+            <p className="text-gray-500 text-sm">{siteConfig.callbackPromise}</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} noValidate>

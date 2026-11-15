@@ -121,13 +121,13 @@ function serviceLineLabel(
   clampNote: string,
 ): string {
   if (serviceType === 'ogorod') {
-    return `Огород: ${formatArea(areaEffective)} × ${OGOROD_RATE_PER_SOTKA} грн/сот.${clampNote}`;
+    return `Город: ${formatArea(areaEffective)} × ${OGOROD_RATE_PER_SOTKA} грн/сот.${clampNote}`;
   }
   if (serviceType === 'celina') {
-    return `Цілина: ${formatArea(areaEffective)} × ${CELINA_RATE_PER_SOTKA} грн (мін. ${CELINA_MIN} грн)${clampNote}`;
+    return `Цілина: ${formatArea(areaEffective)} × ${CELINA_RATE_PER_SOTKA} грн/сот. (мін. ${CELINA_MIN} грн)${clampNote}`;
   }
   if (serviceType === 'mowing') {
-    return `Покос (фрезами): ${formatArea(areaEffective)} × ${MOWING_RATE_PER_SOTKA} грн${clampNote}`;
+    return `Покіс (фрезами): ${formatArea(areaEffective)} × ${MOWING_RATE_PER_SOTKA} грн/сот.${clampNote}`;
   }
   if (serviceType === 'tree') {
     return `Демонтаж: орієнтир від ${TREE_MIN} грн`;

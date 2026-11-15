@@ -56,7 +56,7 @@ export function localBusinessSchema() {
           '@type': 'Offer',
           itemOffered: {
             '@type': 'Service',
-            name: 'Вспашка і культивація',
+            name: 'Оранка і культивація',
             areaServed: 'Харків',
           },
           priceCurrency: 'UAH',
@@ -67,7 +67,7 @@ export function localBusinessSchema() {
           '@type': 'Offer',
           itemOffered: {
             '@type': 'Service',
-            name: 'Обробка целини',
+            name: 'Обробка цілини',
             areaServed: 'Харків',
           },
           priceCurrency: 'UAH',
@@ -78,7 +78,7 @@ export function localBusinessSchema() {
           '@type': 'Offer',
           itemOffered: {
             '@type': 'Service',
-            name: 'Покос трави',
+            name: 'Покіс трави',
             areaServed: 'Харків',
           },
           priceCurrency: 'UAH',
@@ -152,4 +152,4 @@ export function serviceSchema(input: {
 }
 
 /** Bump only when public SEO content actually changes (sitemap lastModified). */
-export const SITE_CONTENT_UPDATED = new Date('2026-11-11T18:00:00.000Z');
+export const SITE_CONTENT_UPDATED = new Date('2026-11-15T12:00:00.000Z');
