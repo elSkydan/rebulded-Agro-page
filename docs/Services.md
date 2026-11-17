@@ -127,22 +127,34 @@ All Telegram Bot API interactions: sending lead notifications to workers, handli
 
 ### Logic
 
-#### `sendLeadNotification(worker, lead)`
-Composes and sends a Telegram message to worker.telegram_chat_id:
+#### `sendLeadToWorker(chatId, leadId, workerId, lead)`
+Sends the lead offer to worker.telegram_chat_id. All texts live in
+`server/services/telegramTexts.js` (Ukrainian; service names match the site's
+`services-catalog.ts`). `buildLeadText(leadId, lead, mode)` has three modes:
+
+| Mode | Used for | Client name and phone |
+|---|---|---|
+| `offer` | first message with buttons | hidden (#59) |
+| `accepted` | the winner's message, edited after Accept | shown |
+| `admin` | admin fallback when the worker has no chat_id | shown |
+
 ```
-Message text (Ukrainian):
-"📋 Новий замовлення!
-Послуга: {service_type_label}
-Площа: {area} сотки
-Місто: {city_name}
-Виїзд: {yes/no}
-Ціна: {total_price} грн
-Клієнт: {phone}
-📞 Зателефонуйте та підтвердіть!"
+📋 Нова заявка #{id}
+🛠 Послуга: {label}
+📐 Площа: {area} соток        (not shown for drilling / washing / tree)
+🌆 Місто: {city_name}
+🚗 За містом: так             (only when out_of_city)
+💬 Коментар: {comment}        (only when present)
+💰 Ціна: {total_price} грн
+🔒 Ім’я та телефон клієнта з’являться після «Прийняти».
+⏰ Дайте відповідь протягом 3 хвилин.
 
 Inline keyboard:
-[✅ Прийняти] [❌ Відхилити]
+[Прийняти ✅] [Відмовитись ❌]
 ```
+
+Client-supplied fields (name, comment) are HTML-escaped. Workers who reject,
+time out or lose the race never receive the phone.
 
 Callback data format (≤64 bytes, JSON):
 ```json

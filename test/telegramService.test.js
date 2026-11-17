@@ -17,6 +17,7 @@ const { test, describe, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { TelegramService, TelegramDeliveryError, buildLeadText } = require('../server/services/telegramService');
+const { formatArea } = require('../server/services/telegramTexts');
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -109,20 +110,22 @@ describe('Case 1 — Success delivery to valid chat_id', () => {
     // chat_id serialised as string (BigInt-safe)
     assert.equal(payload.chat_id, WORKER_CHAT_ID);
 
-    // Message contains the lead details
-    assert.ok(payload.text.includes(SAMPLE_LEAD.name),
-      'text must include client name');
-    assert.ok(payload.text.includes(SAMPLE_LEAD.phone_normalized),
-      'text must include phone');
+    // Message contains the lead id but not the client's contacts (#59)
     assert.ok(payload.text.includes(String(LEAD_ID)),
       'text must include lead id');
+    assert.ok(!payload.text.includes(SAMPLE_LEAD.phone_normalized),
+      'offer must not include the client phone before Accept');
+    assert.ok(!payload.text.includes(SAMPLE_LEAD.name),
+      'offer must not include the client name before Accept');
 
-    // Both inline buttons present
+    // Both inline buttons present, labelled in Ukrainian (#60)
     const kb = payload.reply_markup.inline_keyboard[0];
-    assert.ok(kb.some(btn => btn.callback_data.includes('"a":"accept"')),
-      'Accept button must be present');
-    assert.ok(kb.some(btn => btn.callback_data.includes('"a":"reject"')),
-      'Reject button must be present');
+    const accept = kb.find(btn => btn.callback_data.includes('"a":"accept"'));
+    const reject = kb.find(btn => btn.callback_data.includes('"a":"reject"'));
+    assert.ok(accept, 'Accept button must be present');
+    assert.ok(reject, 'Reject button must be present');
+    assert.equal(accept.text, 'Прийняти ✅');
+    assert.equal(reject.text, 'Відмовитись ❌');
   });
 
   test('isValidChatId accepts numeric strings and bigint-representable values', () => {
@@ -140,19 +143,62 @@ describe('Case 1 — Success delivery to valid chat_id', () => {
     assert.ok(!svc.isValidChatId(0));
   });
 
-  test('buildLeadText includes all lead fields in the HTML output', () => {
-    const text = buildLeadText(LEAD_ID, SAMPLE_LEAD);
+  test('offer text shows job details in Ukrainian and hides client contacts', () => {
+    const text = buildLeadText(LEAD_ID, { ...SAMPLE_LEAD, out_of_city: true, comment: 'Біля ставка' });
+    assert.ok(text.includes(`Нова заявка #${LEAD_ID}`));
+    assert.ok(text.includes('Город / оранка'));        // same label as the site
+    assert.ok(text.includes('50 соток'));
+    assert.ok(text.includes(SAMPLE_LEAD.city_name));
+    assert.ok(text.includes('За містом:</b> так'));
+    assert.ok(text.includes('Біля ставка'));
+    assert.ok(text.includes('1500 грн'));
+    assert.ok(text.includes('протягом 3 хвилин'));
+    assert.ok(!text.includes(SAMPLE_LEAD.phone_normalized));
+    assert.ok(!text.includes(SAMPLE_LEAD.name));
+  });
+
+  test('accepted text shows client name and phone with a call-now line', () => {
+    const text = buildLeadText(LEAD_ID, SAMPLE_LEAD, 'accepted');
     assert.ok(text.includes(SAMPLE_LEAD.name));
     assert.ok(text.includes(SAMPLE_LEAD.phone_normalized));
-    assert.ok(text.includes('Garden tilling'));   // ogorod label
-    assert.ok(text.includes(SAMPLE_LEAD.city_name));
-    assert.ok(text.includes(String(SAMPLE_LEAD.total_price)));
+    assert.ok(text.includes('Ви прийняли заявку'));
+    assert.ok(!text.includes('протягом 3 хвилин'));
+  });
+
+  test('admin text shows client name and phone without worker prompts', () => {
+    const text = buildLeadText(LEAD_ID, SAMPLE_LEAD, 'admin');
+    assert.ok(text.includes(SAMPLE_LEAD.name));
+    assert.ok(text.includes(SAMPLE_LEAD.phone_normalized));
+    assert.ok(!text.includes('протягом 3 хвилин'));
+    assert.ok(!text.includes('Ви прийняли'));
+  });
+
+  test('fixed-price services do not show an area line', () => {
+    const text = buildLeadText(LEAD_ID, { ...SAMPLE_LEAD, service_type: 'drilling', area: 0.5 });
+    assert.ok(text.includes('Буріння лунок'));
+    assert.ok(!text.includes('Площа'));
+  });
+
+  test('client-supplied name and comment are HTML-escaped', () => {
+    const text = buildLeadText(LEAD_ID,
+      { ...SAMPLE_LEAD, name: 'Іван <b>', comment: 'a & b < c' }, 'accepted');
+    assert.ok(text.includes('Іван &lt;b&gt;'));
+    assert.ok(text.includes('a &amp; b &lt; c'));
   });
 
   test('buildLeadText falls back to bare text when lead is null', () => {
     const text = buildLeadText(LEAD_ID, null);
     assert.ok(text.includes(`#${LEAD_ID}`));
-    assert.ok(text.includes('Please respond'));
+    assert.ok(text.includes('протягом 3 хвилин'));
+  });
+
+  test('formatArea uses Ukrainian plural forms and a decimal comma', () => {
+    assert.equal(formatArea(1), '1 сотка');
+    assert.equal(formatArea(3), '3 сотки');
+    assert.equal(formatArea(5), '5 соток');
+    assert.equal(formatArea(11), '11 соток');
+    assert.equal(formatArea(22), '22 сотки');
+    assert.equal(formatArea(2.5), '2,5 сотки');
   });
 
 });
@@ -193,8 +239,14 @@ describe('Case 2 — Fallback when worker chat_id is null or invalid', () => {
 
     // Fallback message must name the worker
     assert.ok(
-      fetchSpy.calls[0].body.text.includes(`Worker #${WORKER_ID}`),
+      fetchSpy.calls[0].body.text.includes(`Виконавець #${WORKER_ID}`),
       'fallback text must identify the worker'
+    );
+
+    // The admin still needs the phone to handle the lead by hand (#59)
+    assert.ok(
+      fetchSpy.calls[0].body.text.includes(SAMPLE_LEAD.phone_normalized),
+      'admin fallback must include the client phone'
     );
   });
 
@@ -252,8 +304,8 @@ describe('Case 2 — Fallback when worker chat_id is null or invalid', () => {
 
     // Second call targeted the admin log channel
     assert.equal(calls[1].chat_id, String(ADMIN_LOG_CHANNEL));
-    assert.ok(calls[1].text.includes('blocked'),
-      'admin alert must mention "blocked"');
+    assert.ok(calls[1].text.includes('заблокував бота'),
+      'admin alert must say the worker blocked the bot');
   });
 
 });

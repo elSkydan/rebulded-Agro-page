@@ -3,11 +3,10 @@
 /**
  * callbackErrors.test.js — node:test
  *
- * Tests the getCallbackErrorMessage() logic in server/routes/telegram.js.
+ * Tests getCallbackErrorMessage() — Ukrainian toasts for Telegram callbacks.
  *
- * Because getCallbackErrorMessage is a module-private function, we extract
- * the mapping logic into a testable helper here and keep the route module
- * as a thin wrapper.
+ * getCallbackErrorMessage lives in server/services/telegramTexts.js; the
+ * route imports it, so these tests cover the code that runs in production.
  *
  * Coverage:
  *   • WORKER_IDENTITY_MISMATCH → linked account message
@@ -20,34 +19,9 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 
-// ---------------------------------------------------------------------------
-// Inline the mapping function (mirrors the one in telegram.js exactly)
-// ---------------------------------------------------------------------------
-
-function getCallbackErrorMessage(err) {
-  switch (err.code) {
-    case 'WORKER_IDENTITY_MISMATCH':
-      return 'Your Telegram account is not linked to this worker profile. Contact admin.';
-
-    case 'LEAD_NOT_YOURS':
-      return 'This lead is no longer assigned to you.';
-
-    case 'INVALID_TRANSITION': {
-      const s = err.leadStatus ?? '';
-      if (s === 'accepted')   return 'This lead has already been accepted.';
-      if (s === 'timeout')    return 'This lead timed out before you responded.';
-      if (s === 'canceled')   return 'This lead was canceled.';
-      if (s === 'unassigned') return 'This lead is no longer available.';
-      return 'This lead is no longer available (state changed).';
-    }
-
-    default:
-      if (err.statusCode === 403) return 'Unauthorized action. Contact admin.';
-      if (err.statusCode === 404) return 'This lead no longer exists.';
-      if (err.statusCode === 409) return 'Action conflict — this lead may already be processed.';
-      return 'Unable to process your response. Please try again or contact admin.';
-  }
-}
+// The real mapping, shared with server/routes/telegram.js (was an inline copy
+// that could drift from the route).
+const { getCallbackErrorMessage } = require('../server/services/telegramTexts');
 
 function makeErr({ code, statusCode, leadStatus, message = 'test error' } = {}) {
   const e = new Error(message);
@@ -64,8 +38,8 @@ function makeErr({ code, statusCode, leadStatus, message = 'test error' } = {}) 
 describe('getCallbackErrorMessage — identity errors', () => {
   test('WORKER_IDENTITY_MISMATCH returns linked-account message', () => {
     const msg = getCallbackErrorMessage(makeErr({ code: 'WORKER_IDENTITY_MISMATCH' }));
-    assert.ok(msg.includes('not linked'), `got: ${msg}`);
-    assert.ok(msg.includes('Contact admin'));
+    assert.ok(msg.includes('не прив’язаний'), `got: ${msg}`);
+    assert.ok(msg.includes('адміністратора'));
     // Must NOT contain internal details
     assert.ok(!msg.includes('telegram_chat_id'));
     assert.ok(!msg.includes('workerId'));
@@ -73,34 +47,34 @@ describe('getCallbackErrorMessage — identity errors', () => {
 
   test('LEAD_NOT_YOURS returns stale-assignment message', () => {
     const msg = getCallbackErrorMessage(makeErr({ code: 'LEAD_NOT_YOURS' }));
-    assert.ok(msg.includes('no longer assigned to you'));
+    assert.ok(msg.includes('вже не призначена вам'));
   });
 });
 
 describe('getCallbackErrorMessage — invalid transitions', () => {
   test('INVALID_TRANSITION + accepted status', () => {
     const msg = getCallbackErrorMessage(makeErr({ code: 'INVALID_TRANSITION', leadStatus: 'accepted' }));
-    assert.ok(msg.includes('already been accepted'));
+    assert.ok(msg.includes('вже прийнято'));
   });
 
   test('INVALID_TRANSITION + timeout status', () => {
     const msg = getCallbackErrorMessage(makeErr({ code: 'INVALID_TRANSITION', leadStatus: 'timeout' }));
-    assert.ok(msg.includes('timed out'));
+    assert.ok(msg.includes('Час на відповідь вийшов'));
   });
 
   test('INVALID_TRANSITION + canceled status', () => {
     const msg = getCallbackErrorMessage(makeErr({ code: 'INVALID_TRANSITION', leadStatus: 'canceled' }));
-    assert.ok(msg.includes('canceled'));
+    assert.ok(msg.includes('скасовано'));
   });
 
   test('INVALID_TRANSITION + unassigned status', () => {
     const msg = getCallbackErrorMessage(makeErr({ code: 'INVALID_TRANSITION', leadStatus: 'unassigned' }));
-    assert.ok(msg.includes('no longer available'));
+    assert.ok(msg.includes('вже недоступна'));
   });
 
   test('INVALID_TRANSITION + unknown status falls back gracefully', () => {
     const msg = getCallbackErrorMessage(makeErr({ code: 'INVALID_TRANSITION', leadStatus: 'new' }));
-    assert.ok(msg.includes('no longer available'));
+    assert.ok(msg.includes('вже недоступна'));
     // Must not expose raw status string in a misleading way
     assert.ok(!msg.includes('stack'));
   });
@@ -109,17 +83,17 @@ describe('getCallbackErrorMessage — invalid transitions', () => {
 describe('getCallbackErrorMessage — HTTP status fallbacks', () => {
   test('statusCode 403 without specific code', () => {
     const msg = getCallbackErrorMessage(makeErr({ statusCode: 403 }));
-    assert.ok(msg.includes('Unauthorized'));
+    assert.ok(msg.includes('Дія недоступна'));
   });
 
   test('statusCode 404', () => {
     const msg = getCallbackErrorMessage(makeErr({ statusCode: 404 }));
-    assert.ok(msg.includes('no longer exists'));
+    assert.ok(msg.includes('більше не існує'));
   });
 
   test('statusCode 409', () => {
     const msg = getCallbackErrorMessage(makeErr({ statusCode: 409 }));
-    assert.ok(msg.includes('conflict'));
+    assert.ok(msg.includes('Конфлікт'));
   });
 
   test('unknown error returns safe fallback', () => {

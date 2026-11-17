@@ -14,6 +14,7 @@
 const pool             = require('../../db/pool');
 const { reassignLead } = require('./assignmentService');
 const telegramService  = require('./telegramService');
+const { ADMIN }        = require('./telegramTexts');
 const {
   TIMEOUT_MINUTES,
   ACCEPTED_TTL_MINUTES,
@@ -139,7 +140,7 @@ async function processAcceptedTTL() {
   for (const leadId of expiredIds) {
     log('lead_timeout', leadId, null);
     telegramService
-      .notifyAdmin(ADMIN_CHAT_ID, leadId, 'Accepted but no contact — marked failed_contact')
+      .notifyAdmin(ADMIN_CHAT_ID, leadId, ADMIN.reasons.noContact)
       .catch(err =>
         console.error(`[timeoutService] notifyAdmin failed for lead ${leadId}:`, err.message)
       );
@@ -208,7 +209,7 @@ async function handleLeadTimeout(leadId) {
       log('lead_timeout', leadId, null);
 
       telegramService
-        .notifyAdmin(ADMIN_CHAT_ID, leadId, 'Lead timed out — no worker responded')
+        .notifyAdmin(ADMIN_CHAT_ID, leadId, ADMIN.reasons.timedOut)
         .catch(err => console.error('[timeoutService] notifyAdmin failed:', err.message));
 
       return { result: 'expired', timedOutCount: timedOut ?? 0 };

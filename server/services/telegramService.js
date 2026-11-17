@@ -38,50 +38,10 @@ class TelegramDeliveryError extends Error {
 }
 
 // ---------------------------------------------------------------------------
-// Message formatter — pure function, no I/O
+// Message texts — Ukrainian, see ./telegramTexts.js
 // ---------------------------------------------------------------------------
 
-const SERVICE_LABELS = {
-  ogorod:   'Garden tilling',
-  celina:   'Virgin land',
-  mowing:   'Mowing',
-  tree:     'Tree work',
-  washing:  'Washing',
-  drilling: 'Hole drilling',
-};
-
-/**
- * Build the worker-facing lead notification text.
- *
- * @param {number}      leadId
- * @param {object|null} lead   — { name, phone_normalized, service_type, area,
- *                                 total_price, city_name, city_id,
- *                                 out_of_city, comment }
- * @returns {string}  HTML-safe (Telegram HTML parse_mode)
- */
-function buildLeadText(leadId, lead) {
-  if (!lead) return `New lead #${leadId}\n\nPlease respond within 3 minutes.`;
-
-  const serviceLabel = SERVICE_LABELS[lead.service_type] ?? lead.service_type;
-
-  const lines = [
-    `📋 <b>New lead #${leadId}</b>`,
-    ``,
-    `👤 <b>Client:</b> ${lead.name}`,
-    `📞 <b>Phone:</b> ${lead.phone_normalized}`,
-    `🛠 <b>Service:</b> ${serviceLabel}`,
-    `📐 <b>Area:</b> ${lead.area} sotka`,
-    `🌆 <b>City:</b> ${lead.city_name ?? lead.city_id}`,
-  ];
-
-  if (lead.out_of_city) lines.push(`🚗 <b>Out of city:</b> Yes`);
-  if (lead.comment)     lines.push(`💬 <b>Comment:</b> ${lead.comment}`);
-
-  lines.push(``, `💰 <b>Price:</b> ${lead.total_price} UAH`);
-  lines.push(``, `⏰ Please respond within 3 minutes.`);
-
-  return lines.join('\n');
-}
+const { BUTTONS, ADMIN, buildLeadText } = require('./telegramTexts');
 
 // ---------------------------------------------------------------------------
 // TelegramService class
@@ -358,10 +318,10 @@ class TelegramService {
         errorDesc: 'Worker has no valid chat_id',
       });
 
+      // Admin copy keeps the client's contacts — the admin handles the lead by hand.
       const fallbackText =
-        `⚠️ <b>Worker #${workerId} has no Telegram linked.</b>\n` +
-        `Lead #${leadId} could not be delivered.\n\n` +
-        buildLeadText(leadId, lead);
+        ADMIN.workerNoTelegram(workerId, leadId) + '\n\n' +
+        buildLeadText(leadId, lead, 'admin');
 
       this._post('sendMessage', {
         chat_id:    this._serializeChatId(this._adminLogChannel),
@@ -381,12 +341,14 @@ class TelegramService {
     try {
       const result = await this._post('sendMessage', {
         chat_id:    this._serializeChatId(chatId),
-        text:       buildLeadText(leadId, lead),
+        // No client contacts until Accept (#59): a worker who rejects or times
+        // out must not keep the phone in the chat history.
+        text:       buildLeadText(leadId, lead, 'offer'),
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [[
-            { text: 'Accept ✅', callback_data: acceptData },
-            { text: 'Reject ❌', callback_data: rejectData },
+            { text: BUTTONS.accept, callback_data: acceptData },
+            { text: BUTTONS.reject, callback_data: rejectData },
           ]],
         },
       });
@@ -418,10 +380,7 @@ class TelegramService {
       if (errCode === 403) {
         this._post('sendMessage', {
           chat_id: this._serializeChatId(this._adminLogChannel),
-          text:
-            `⚠️ <b>Worker #${workerId}</b> (chat_id: <code>${chatId}</code>) ` +
-            `has blocked the bot.\n` +
-            `Lead #${leadId} was not delivered.`,
+          text:    ADMIN.workerBlockedBot(workerId, chatId, leadId),
           parse_mode: 'HTML',
         }).catch(e =>
           console.error('[TelegramService] admin fallback for blocked worker failed:', e.message)
@@ -492,7 +451,7 @@ class TelegramService {
   async notifyAdmin(adminChatId, leadId, reason) {
     await this._post('sendMessage', {
       chat_id: this._serializeChatId(adminChatId),
-      text:    `Admin alert — Lead #${leadId}: ${reason}`,
+      text:    ADMIN.leadAlert(leadId, reason),
     });
   }
 
@@ -508,16 +467,18 @@ class TelegramService {
     if (!body) return;
     await this._post('sendMessage', {
       chat_id: this._serializeChatId(adminChatId),
-      text:    body.startsWith('Admin alert') ? body : `Admin alert — ${body}`,
+      text:    body.startsWith(ADMIN.prefix) ? body : `${ADMIN.prefix} — ${body}`,
     });
   }
 
   /**
    * Expose buildLeadText as an instance method so existing callers
    * (telegram.js route) can call telegramService.buildLeadText(…).
+   *
+   * @param {'offer'|'accepted'|'admin'} [mode='offer']
    */
-  buildLeadText(leadId, lead) {
-    return buildLeadText(leadId, lead);
+  buildLeadText(leadId, lead, mode = 'offer') {
+    return buildLeadText(leadId, lead, mode);
   }
 }
 

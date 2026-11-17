@@ -33,42 +33,13 @@ const { acceptLead,
 const telegramService                  = require('../services/telegramService');
 const { ADMIN_CHAT_ID }                = require('../../config/config');
 const pool                             = require('../../db/pool');
+const { WORKER,
+        ADMIN,
+        getCallbackErrorMessage }      = require('../services/telegramTexts');
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Map a business-logic error to a short user-readable Telegram toast message.
- * NEVER expose stack traces, DB errors, or internal details to users.
- *
- * @param {Error} err
- * @returns {string}  max ~200 chars (Telegram answerCallbackQuery limit)
- */
-function getCallbackErrorMessage(err) {
-  switch (err.code) {
-    case 'WORKER_IDENTITY_MISMATCH':
-      return 'Your Telegram account is not linked to this worker profile. Contact admin.';
-
-    case 'LEAD_NOT_YOURS':
-      return 'This lead is no longer assigned to you.';
-
-    case 'INVALID_TRANSITION': {
-      const s = err.leadStatus ?? '';
-      if (s === 'accepted')   return 'This lead has already been accepted.';
-      if (s === 'timeout')    return 'This lead timed out before you responded.';
-      if (s === 'canceled')   return 'This lead was canceled.';
-      if (s === 'unassigned') return 'This lead is no longer available.';
-      return 'This lead is no longer available (state changed).';
-    }
-
-    default:
-      if (err.statusCode === 403) return 'Unauthorized action. Contact admin.';
-      if (err.statusCode === 404) return 'This lead no longer exists.';
-      if (err.statusCode === 409) return 'Action conflict — this lead may already be processed.';
-      return 'Unable to process your response. Please try again or contact admin.';
-  }
-}
 
 /**
  * Structured JSON logger — all lines are grep-friendly with a consistent prefix.
@@ -121,7 +92,7 @@ router.post('/webhook', (req, res) => {
         parsed = JSON.parse(cq.data);
       } catch {
         console.error('[telegram:webhook] unparseable callback_data:', cq.data);
-        await telegramService.answerCallback(callbackQueryId, 'Invalid button data.').catch(() => {});
+        await telegramService.answerCallback(callbackQueryId, WORKER.invalidButton).catch(() => {});
         return;
       }
 
@@ -131,7 +102,7 @@ router.post('/webhook', (req, res) => {
 
       if (!Number.isFinite(leadId) || !Number.isFinite(workerId) || !action) {
         console.error('[telegram:webhook] invalid callback payload:', JSON.stringify(parsed));
-        await telegramService.answerCallback(callbackQueryId, 'Malformed button data.').catch(() => {});
+        await telegramService.answerCallback(callbackQueryId, WORKER.invalidButton).catch(() => {});
         return;
       }
 
@@ -151,7 +122,7 @@ router.post('/webhook', (req, res) => {
         await handleReject({ leadId, workerId, telegramChatId, messageId, callbackQueryId });
       } else {
         console.error('[telegram:webhook] unknown action:', action);
-        await telegramService.answerCallback(callbackQueryId, 'Unknown action.').catch(() => {});
+        await telegramService.answerCallback(callbackQueryId, WORKER.unknownAction).catch(() => {});
       }
 
     } catch (err) {
@@ -209,12 +180,9 @@ async function handleAccept({ leadId, workerId, telegramChatId, messageId, callb
       );
     }
 
-    const confirmText = leadData
-      ? telegramService.buildLeadText(leadId, leadData).replace(
-          /⏰ Please respond within 3 minutes\./,
-          '✅ <b>You accepted this lead. Call the client now!</b>'
-        )
-      : `✅ Lead #${leadId} is assigned to you!`;
+    // The client's name and phone are revealed only here, to the winner (#59).
+    // leadData === null (read failed) yields a "contact the admin" text.
+    const confirmText = telegramService.buildLeadText(leadId, leadData, 'accepted');
 
     logEvent('info', '[telegram:callback]', {
       event:     'accept_success',
@@ -226,8 +194,8 @@ async function handleAccept({ leadId, workerId, telegramChatId, messageId, callb
       messageId
         ? telegramService.editMessageText(telegramChatId, messageId, confirmText)
         : Promise.resolve(),
-      telegramService.notifyAdmin(ADMIN_CHAT_ID, leadId, `Accepted by worker ${workerId}`),
-      telegramService.answerCallback(callbackQueryId, 'Lead accepted! 🎉'),
+      telegramService.notifyAdmin(ADMIN_CHAT_ID, leadId, ADMIN.reasons.acceptedBy(workerId)),
+      telegramService.answerCallback(callbackQueryId, WORKER.toastAccepted),
     ]);
 
     // Notify workers who lost the race (fire-and-forget; failures non-critical)
@@ -237,7 +205,7 @@ async function handleAccept({ leadId, workerId, telegramChatId, messageId, callb
         .editMessageText(
           loser.telegram_chat_id,
           loser.message_id,
-          `Lead #${leadId} was taken by another worker.`
+          WORKER.takenByOther(leadId)
         )
         .catch(err =>
           console.error(
@@ -258,15 +226,15 @@ async function handleAccept({ leadId, workerId, telegramChatId, messageId, callb
       messageId
         ? telegramService.editMessageText(
             telegramChatId, messageId,
-            `Lead #${leadId} has already been taken.`
+            WORKER.alreadyTaken(leadId)
           )
         : Promise.resolve(),
-      telegramService.answerCallback(callbackQueryId, 'Already taken by another worker.'),
+      telegramService.answerCallback(callbackQueryId, WORKER.toastTaken),
     ]);
 
   } else {
     // alreadyAccepted: idempotent second press from the same winner
-    await telegramService.answerCallback(callbackQueryId, 'Already confirmed ✅').catch(() => {});
+    await telegramService.answerCallback(callbackQueryId, WORKER.toastConfirmed).catch(() => {});
   }
 }
 
@@ -293,10 +261,10 @@ async function handleReject({ leadId, workerId, telegramChatId, messageId, callb
     messageId
       ? telegramService.editMessageText(
           telegramChatId, messageId,
-          `Lead #${leadId} — Declined`
+          WORKER.declined(leadId)
         )
       : Promise.resolve(),
-    telegramService.answerCallback(callbackQueryId, 'Declined'),
+    telegramService.answerCallback(callbackQueryId, WORKER.toastDeclined),
   ]);
 }
 
