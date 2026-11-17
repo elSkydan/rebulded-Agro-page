@@ -20,6 +20,7 @@
 
 const pool            = require('../../db/pool');
 const telegramService = require('./telegramService');
+const { ADMIN }       = require('./telegramTexts');
 const { ACTIVE_LEAD_LIMIT, ADMIN_CHAT_ID } = require('../../config/config');
 
 // ---------------------------------------------------------------------------
@@ -283,7 +284,7 @@ async function assignLead(leadId, cityId) {
 
       // STEP 9: Telegram after commit
       telegramService
-        .notifyAdmin(ADMIN_CHAT_ID, leadId, 'No workers available')
+        .notifyAdmin(ADMIN_CHAT_ID, leadId, ADMIN.reasons.noWorkers)
         .catch(err => console.error('[telegram] notifyAdmin failed:', err.message));
 
       return { assigned: false, workerId: null, worker: null, status: 'unassigned' };
@@ -443,7 +444,7 @@ async function reassignLead(leadId, reason) {
       log('lead_timeout', leadId, null);
 
       telegramService
-        .notifyAdmin(ADMIN_CHAT_ID, leadId, `Unassigned after ${reason}`)
+        .notifyAdmin(ADMIN_CHAT_ID, leadId, ADMIN.reasons.unassignedAfter(reason))
         .catch(err => console.error('[telegram] notifyAdmin failed:', err.message));
 
       return { assigned: false, workerId: null, worker: null, status: 'unassigned' };
@@ -866,7 +867,7 @@ async function rejectLead(workerId, leadId) {
 
     if (allRejected) {
       telegramService
-        .notifyAdmin(ADMIN_CHAT_ID, leadId, 'All workers rejected — lead unassigned')
+        .notifyAdmin(ADMIN_CHAT_ID, leadId, ADMIN.reasons.allRejected)
         .catch(err => console.error('[rejectLead] notifyAdmin failed:', err.message));
       return { result: 'unassigned' };
     }
